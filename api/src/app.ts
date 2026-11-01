@@ -1,3 +1,4 @@
+import { FAVICON_SVG } from "./favicon.ts";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Address } from "viem";
@@ -150,6 +151,11 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
     );
   });
 
+  // Directory icon (x402scan reads /favicon.ico at the API root). SVG served under both names.
+  const icon = (c: { body(data: string, status: 200, headers: Record<string, string>): Response }) =>
+    c.body(FAVICON_SVG, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" });
+  app.get("/favicon.ico", icon);
+  app.get("/favicon.svg", icon);
   app.get("/v1/sample", (c) => c.json(SAMPLE_VERDICT));
 
   registerDiscovery(app, cfg);
