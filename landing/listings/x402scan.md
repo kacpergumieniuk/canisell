@@ -1,6 +1,6 @@
 # x402scan
 
-x402scan (x402scan.com) lists x402 resources that sellers register by URL. The registration page title is "Add API", but its content did not load for the research fetch, so the exact fields are **unverified**: expect a URL field, and expect it to read the resource's 402 response (and probably `/.well-known/x402` or an OpenAPI document, which are not implemented in `api/src` yet; see `README.md` in this folder).
+x402scan (x402scan.com) lists x402 resources that sellers register by URL. The registration page title is "Add API", but its content did not load for the research fetch, so the exact fields are **unverified**: expect a URL field, and expect it to read the resource's 402 response (and probably `/.well-known/x402` or an OpenAPI document, both now served by the API).
 
 ## Before submitting
 

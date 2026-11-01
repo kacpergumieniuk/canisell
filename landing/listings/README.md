@@ -20,7 +20,7 @@ The name "Canisell" is a recommendation (see `../NAMES.md`), not a decision. The
 
 1. The API is not deployed (`api/README.md`: "Not deployed yet"). Directories scan a live URL, so deploy to mainnet first (`npx wrangler deploy --env production`, owner action).
 2. The MCP server is not published. Today it runs from a local path with `tsx`. It needs a public GitHub repo and an npm package (`canisell-mcp`, with a `bin` and `"mcpName": "io.github.kacpergumieniuk/canisell"` in `package.json`), published by the owner with 2FA or trusted publishing. The landing page MCP snippet assumes this package exists.
-3. Discovery files are not implemented in `api/src`: `/.well-known/x402`, `/openapi.json`, `/llms.txt` (planned in `research/marketing.md` week 1, item 2). x402scan and some directories read them. The Bazaar metadata is already attached to the paid routes.
+3. Discovery files are implemented: `/.well-known/x402`, `/openapi.json`, `/llms.txt` (free, see `api/src/discovery.ts`).
 4. One paid test call from our own wallet is needed for Bazaar indexing (D11). It is not counted as revenue and is not repeated.
 
 ## Suggested order and files

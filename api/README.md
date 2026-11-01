@@ -83,7 +83,7 @@ Run by hand: `npm run mcp`. Client config (Claude Desktop `claude_desktop_config
   "mcpServers": {
     "base-token-verdict": {
       "command": "npx",
-      "args": ["tsx", "/ABSOLUTE/PATH/TO/onchain-biz/api/mcp/server.ts"],
+      "args": ["tsx", "/ABSOLUTE/PATH/TO/canisell/api/mcp/server.ts"],
       "env": {
         "VERDICT_API_URL": "https://base-token-verdict.<your-subdomain>.workers.dev",
         "EVM_PRIVATE_KEY": "0x...your dedicated wallet key..."
