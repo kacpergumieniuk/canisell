@@ -8,6 +8,8 @@ export class Timings {
   private entries: Array<{ name: string; ms: number }> = [];
   private open = new Map<string, number>();
   private t0 = now();
+  /** Work that should outlive the response (cache writes); the request handler hands it to waitUntil. */
+  readonly background: Promise<unknown>[] = [];
   /** Free-form facts for the log line (cache hit, verdict, ...). Never put secrets here. */
   readonly info: Record<string, string | number | boolean | undefined> = {};
 
@@ -51,7 +53,9 @@ export class Timings {
 
   /** `a;dur=1.2, b;dur=3.4` — names are restricted to token characters. */
   header(): string {
-    return [...this.entries, { name: "total", ms: this.totalMs }].map((e) => `${e.name.replace(/[^A-Za-z0-9_-]/g, "_")};dur=${e.ms}`).join(", ");
+    const parts = [...this.entries, { name: "total", ms: this.totalMs }].map((e) => `${e.name.replace(/[^A-Za-z0-9_-]/g, "_")};dur=${e.ms}`);
+    if (typeof this.info.cache === "string") parts.push(`cache;desc="${this.info.cache.replace(/[^A-Za-z0-9_-]/g, "_")}"`);
+    return parts.join(", ");
   }
 
   toJSON() {

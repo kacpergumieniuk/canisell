@@ -14,8 +14,19 @@ export const FACILITATORS = {
 
 export const DEFAULT_PAY_TO = "0x741f78ED943C671e25405dAAaAB7b6886C7e8feb";
 
+/**
+ * Free public Base RPCs, comma-separated and tried in order. From Cloudflare's shared egress IPs publicnode and
+ * mainnet.base.org answer HTTP 429 for most of a verdict's calls, so they sit behind providers that held up in
+ * testing (state-override eth_call, Multicall3, archive eth_getCode). Providers change limits without notice:
+ * for production traffic put a keyed endpoint first (`wrangler secret put RPC_URL`).
+ */
+export const DEFAULT_RPC_URLS = "https://base-public.nodies.app,https://base-mainnet.public.blastapi.io,https://base-rpc.publicnode.com";
+export const DEFAULT_ARCHIVE_RPC_URLS = "https://base-public.nodies.app,https://base-mainnet.public.blastapi.io,https://base-rpc.publicnode.com,https://mainnet.base.org";
+/** eth_getLogs over 10k blocks: only publicnode allows that range on a free tier. */
+export const DEFAULT_LOGS_RPC_URL = "https://base-rpc.publicnode.com";
+
 export interface Config {
-  /** Base mainnet RPC used for reads and eth_call simulations (needs state overrides). */
+  /** Base mainnet RPC(s), comma-separated, for reads and eth_call simulations (needs state overrides). */
   rpcUrl: string;
   /** RPC with archive state, used only for eth_getCode at past blocks (token age). */
   archiveRpcUrl: string;
@@ -51,9 +62,9 @@ export function loadConfig(env: EnvLike = {}): Config {
   if (!/^0x[0-9a-fA-F]{40}$/.test(payTo)) throw new Error("PAY_TO must be an EVM address");
 
   return {
-    rpcUrl: env.RPC_URL ?? "https://base-rpc.publicnode.com",
-    archiveRpcUrl: env.ARCHIVE_RPC_URL ?? "https://mainnet.base.org",
-    logsRpcUrl: env.LOGS_RPC_URL ?? "https://base-rpc.publicnode.com",
+    rpcUrl: env.RPC_URL ?? DEFAULT_RPC_URLS,
+    archiveRpcUrl: env.ARCHIVE_RPC_URL ?? DEFAULT_ARCHIVE_RPC_URLS,
+    logsRpcUrl: env.LOGS_RPC_URL ?? DEFAULT_LOGS_RPC_URL,
     network,
     facilitatorUrl,
     payTo,

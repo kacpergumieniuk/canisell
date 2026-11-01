@@ -114,6 +114,8 @@ export interface TokenFacts {
   creator: CreatorFacts;
   /** sub-checks that failed or timed out */
   errors: string[];
+  /** Best-effort checks that did not finish in their time box (reported as "unknown", never silently dropped). */
+  unknown?: Array<"age" | "creator" | "creator-history">;
 }
 
 export type VerdictLabel = "SAFE" | "CAUTION" | "DANGER";

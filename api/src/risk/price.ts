@@ -25,6 +25,12 @@ export function spotPrice0In1(sqrtPriceX96: bigint, dec0: number, dec1: number):
   return s * s * 10 ** (dec0 - dec1);
 }
 
+const KNOWN_QUOTE_META: Record<string, TokenMeta> = {
+  [BASE.weth.toLowerCase()]: { symbol: "WETH", decimals: 18 },
+  [BASE.usdc.toLowerCase()]: { symbol: "USDC", decimals: 6 },
+  [BASE.usdbc.toLowerCase()]: { symbol: "USDbC", decimals: 6 },
+};
+
 export interface TokenMeta {
   symbol?: string;
   decimals: number;
@@ -41,6 +47,9 @@ export class PriceBook {
   tokenMeta(addr: Address): Promise<TokenMeta> {
     const k = addr.toLowerCase();
     if (BigInt(addr) === 0n) return Promise.resolve({ symbol: "ETH", decimals: 18 });
+    // The usual quote assets are immutable and well known: no round trip needed.
+    const known = KNOWN_QUOTE_META[k];
+    if (known) return Promise.resolve(known);
     if (!this.meta.has(k)) {
       this.meta.set(
         k,

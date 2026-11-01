@@ -9,7 +9,9 @@ import {
   type PublicClient,
 } from "viem";
 import { BASE } from "../chain/addresses.ts";
+import { isOnChainFailure } from "./contract.ts";
 import type { Clients } from "../chain/client.ts";
+import type { CoarseAge } from "./age.ts";
 import type { CreationFacts, Launchpad, PoolKeyV4, PoolRef } from "./types.ts";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as Address;
@@ -97,14 +99,6 @@ function v4Ref(token: Address, key: PoolKeyV4, source: PoolRef["source"], launch
   };
 }
 
-async function safe<T>(p: Promise<T>): Promise<T | undefined> {
-  try {
-    return await p;
-  } catch {
-    return undefined;
-  }
-}
-
 export interface Discovery {
   pools: PoolRef[];
   /** false when a lookup failed, so "no pool" may be a false negative */
@@ -114,19 +108,45 @@ export interface Discovery {
   errors: string[];
 }
 
+export interface DiscoveryContext {
+  /** Chain head; only awaited when the v4 log scan is needed. */
+  head: Promise<number>;
+  /** The age search's first round (resolves undefined if it cannot tell). Lets the log scan start long before the exact creation block is known. */
+  coarse?: Promise<CoarseAge | undefined>;
+  /** Creation facts ({} when unknown); only awaited when the v4 log scan is needed. Must not reject. */
+  creation: Promise<CreationFacts>;
+}
+
 /**
  * Finds pools for `token` on Uniswap v4 (launchpad keys, standard keys, Initialize logs near creation),
  * Uniswap v3/v2 and Aerodrome v2 (factory lookups against WETH and USDC).
+ *
+ * Everything except the log scan is one batched round of reads plus one slot0 read, and does not depend on the
+ * token's age. The log scan (the slow, rate-limited part) only runs when no live launchpad pool was found:
+ * a Clanker/Zora token's pool is read straight from the launchpad, so scanning logs for more v4 pools would
+ * only add latency. Tokens that did not come from a known launchpad still get the scan.
  */
 export async function discoverPools(
   clients: Clients,
   token: Address,
-  creation: CreationFacts,
-  head: number,
+  ctx: DiscoveryContext,
 ): Promise<Discovery> {
   const { rpc } = clients;
   const errors: string[] = [];
   const quotes = [BASE.weth, BASE.usdc] as Address[];
+  // A lookup that reverts means "not there" (e.g. no Zora getPoolKey on a plain token). One that never reached a
+  // node says nothing, so it must not read as "no pool": note it and report the discovery as incomplete.
+  let lookupFailed = false;
+  const safe = async <T,>(p: Promise<T>): Promise<T | undefined> => {
+    try {
+      return await p;
+    } catch (e) {
+      if (isOnChainFailure(e)) return undefined;
+      lookupFailed = true;
+      if (errors.length < 3) errors.push(`pool lookup failed: ${(e as Error).message?.slice(0, 100)}`);
+      return undefined;
+    }
+  };
 
   const zoraP = safe(rpc.readContract({ address: token, abi: ZORA_COIN_ABI, functionName: "getPoolKey" }));
   const zoraPayoutP = safe(rpc.readContract({ address: token, abi: ZORA_COIN_ABI, functionName: "payoutRecipient" }));
@@ -137,12 +157,28 @@ export async function discoverPools(
     rpc.readContract({ address: token, abi: parseAbi(["function admin() view returns (address)"]), functionName: "admin" }),
   );
 
-  // Standard hookless v4 keys against native ETH, WETH and USDC.
+  // Standard hookless v4 keys against native ETH, WETH and USDC. They depend only on the token, so their slot0
+  // read goes out together with the launchpad and factory lookups instead of after them.
   const stdKeys: PoolKeyV4[] = [];
   for (const q of [ZERO, BASE.weth, BASE.usdc] as Address[]) {
     const [c0, c1] = sortCurrencies(token, q);
     for (const [fee, tickSpacing] of V4_STANDARD_FEES) stdKeys.push({ currency0: c0, currency1: c1, fee, tickSpacing, hooks: ZERO });
   }
+  const seen = new Set<string>();
+  const unique = (list: PoolRef[]) => list.filter((p) => !seen.has(p.id) && !!seen.add(p.id));
+  const initialized = async (list: PoolRef[]): Promise<PoolRef[]> => {
+    if (list.length === 0) return [];
+    try {
+      const slot0s = await readV4Slot0s(rpc, list.map((p) => p.id));
+      return list.filter((_, i) => slot0s[i].sqrtPriceX96 !== 0n);
+    } catch (e) {
+      errors.push(`v4 slot0 read failed: ${(e as Error).message?.slice(0, 120)}`);
+      incomplete = true;
+      return [];
+    }
+  };
+  let incomplete = false;
+  const stdInitP = initialized(unique(stdKeys.map((key) => v4Ref(token, key, "standard-key"))));
 
   const v2P = Promise.all(
     quotes.map((q) => safe(rpc.readContract({ address: BASE.v2Factory, abi: V2_FACTORY_ABI, functionName: "getPair", args: [token, q] }))),
@@ -172,33 +208,7 @@ export async function discoverPools(
     ),
   );
 
-  // Scan v4 Initialize logs in the 10k blocks after creation; if the creation block is unknown
-  // (archive lookup failed), scan the latest 10k blocks, which covers launches up to ~5.5 h old.
-  let logsP: Promise<PoolKeyV4[]> = Promise.resolve([]);
-  const knownAndRecent = creation.createdBlock !== undefined && head - creation.createdBlock < LOG_MAX_AGE_BLOCKS;
-  const unknownAge = creation.createdBlock === undefined && creation.olderThanDays === undefined;
-  if (knownAndRecent || unknownAge) {
-    const fromBlock = BigInt(knownAndRecent ? creation.createdBlock! : Math.max(0, head - LOG_WINDOW));
-    const toBlock = BigInt(knownAndRecent ? Math.min(creation.createdBlock! + LOG_WINDOW, head) : head);
-    const q = (args: { currency0?: Address; currency1?: Address }) =>
-      clients.logs.getLogs({ address: BASE.v4PoolManager, event: INITIALIZE_EVENT, args, fromBlock, toBlock });
-    logsP = Promise.all([q({ currency0: token }), q({ currency1: token })])
-      .then(([a, b]) =>
-        [...a, ...b].map((l) => ({
-          currency0: getAddress(l.args.currency0!),
-          currency1: getAddress(l.args.currency1!),
-          fee: Number(l.args.fee),
-          tickSpacing: Number(l.args.tickSpacing),
-          hooks: getAddress(l.args.hooks!),
-        })),
-      )
-      .catch((e) => {
-        errors.push(`v4 log scan failed: ${(e as Error).message?.slice(0, 120)}`);
-        return [];
-      });
-  }
-
-  const [zoraKey, zoraPayout, clanker, clankerAdmin, v2, aero, v3, cl, logKeys] = await Promise.all([
+  const [zoraKey, zoraPayout, clanker, clankerAdmin, v2, aero, v3, cl] = await Promise.all([
     zoraP,
     zoraPayoutP,
     clankerP,
@@ -207,7 +217,6 @@ export async function discoverPools(
     aeroP,
     v3P,
     clP,
-    logsP,
   ]);
 
   const out: Discovery = { pools: [], errors, complete: true };
@@ -227,31 +236,54 @@ export async function discoverPools(
     const [c0, c1] = sortCurrencies(token, BASE.weth);
     candidates.push(v4Ref(token, { currency0: c0, currency1: c1, fee: DYNAMIC_FEE, tickSpacing: 200, hooks: clankerHook }, "clanker", "clanker"));
   }
-  for (const key of stdKeys) candidates.push(v4Ref(token, key, "standard-key"));
-  for (const key of logKeys) {
-    const lp: Launchpad | undefined =
-      clankerHook && key.hooks.toLowerCase() === clankerHook.toLowerCase()
-        ? "clanker"
-        : zoraKey && key.hooks.toLowerCase() === zoraKey.hooks.toLowerCase()
-          ? "zora"
-          : undefined;
-    candidates.push(v4Ref(token, key, "logs", lp));
-  }
 
   // Keep only v4 candidates that are initialized (sqrtPrice != 0); dedupe by id.
-  const uniq = new Map<string, PoolRef>();
-  for (const c of candidates) if (!uniq.has(c.id)) uniq.set(c.id, c);
-  const v4List = [...uniq.values()];
-  try {
-    const slot0s = await readV4Slot0s(rpc, v4List.map((p) => p.id));
-    v4List.forEach((p, i) => {
-      if (slot0s[i].sqrtPriceX96 !== 0n) out.pools.push(p);
-    });
-  } catch (e) {
-    errors.push(`v4 slot0 read failed: ${(e as Error).message?.slice(0, 120)}`);
-    out.complete = false;
+  const v4Pools = [...(await initialized(unique(candidates))), ...(await stdInitP)];
+
+  // Scan v4 Initialize logs in the 10k blocks after creation; if the creation block is unknown
+  // (archive lookup failed), scan the latest 10k blocks, which covers launches up to ~5.5 h old.
+  // Skipped when a launchpad pool is live (see above).
+  if (!v4Pools.some((p) => p.launchpad)) {
+    // Window selection. The coarse answer (one archive round trip) is enough for most tokens: created within the
+    // last ~5 h means the latest 10k blocks hold its whole life, so the scan need not wait for the exact creation block.
+    const head = await ctx.head;
+    const coarse = await ctx.coarse;
+    const recent = coarse && !coarse.olderThan30d && coarse.createdWithinBlocks !== undefined && coarse.createdWithinBlocks < LOG_WINDOW;
+    const creation: CreationFacts = coarse?.olderThan30d ? { olderThanDays: 30 } : recent ? {} : await ctx.creation;
+    const knownAndRecent = creation.createdBlock !== undefined && head - creation.createdBlock < LOG_MAX_AGE_BLOCKS;
+    const unknownAge = creation.createdBlock === undefined && creation.olderThanDays === undefined;
+    if (knownAndRecent || unknownAge) {
+      const fromBlock = BigInt(knownAndRecent ? creation.createdBlock! : Math.max(0, head - LOG_WINDOW));
+      const toBlock = BigInt(knownAndRecent ? Math.min(creation.createdBlock! + LOG_WINDOW, head) : head);
+      const q = (args: { currency0?: Address; currency1?: Address }) =>
+        clients.logs.getLogs({ address: BASE.v4PoolManager, event: INITIALIZE_EVENT, args, fromBlock, toBlock });
+      try {
+        const [a, b] = await Promise.all([q({ currency0: token }), q({ currency1: token })]);
+        const keys: PoolKeyV4[] = [...a, ...b].map((l) => ({
+          currency0: getAddress(l.args.currency0!),
+          currency1: getAddress(l.args.currency1!),
+          fee: Number(l.args.fee),
+          tickSpacing: Number(l.args.tickSpacing),
+          hooks: getAddress(l.args.hooks!),
+        }));
+        const refs = keys.map((key) => {
+          const lp: Launchpad | undefined =
+            clankerHook && key.hooks.toLowerCase() === clankerHook.toLowerCase()
+              ? "clanker"
+              : zoraKey && key.hooks.toLowerCase() === zoraKey.hooks.toLowerCase()
+                ? "zora"
+                : undefined;
+          return v4Ref(token, key, "logs", lp);
+        });
+        v4Pools.push(...(await initialized(unique(refs))));
+      } catch (e) {
+        errors.push(`v4 log scan failed: ${(e as Error).message?.slice(0, 120)}`);
+        incomplete = true;
+      }
+    }
   }
-  if (errors.some((e) => e.startsWith("v4 log scan failed"))) out.complete = false;
+  out.pools.push(...v4Pools);
+  out.complete = !lookupFailed && !incomplete;
 
   const pushPair = (kind: PoolRef["kind"], addr: Address | undefined, q: Address) => {
     if (!addr || BigInt(addr) === 0n) return;

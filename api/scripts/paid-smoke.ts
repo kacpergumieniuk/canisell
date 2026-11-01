@@ -37,6 +37,7 @@ console.log(`paid: ${paid.status} in ${Date.now() - started} ms (payer ${account
 console.log(`server-timing: ${paid.headers.get("Server-Timing") ?? "(none)"}`);
 const receipt = paid.headers.get("PAYMENT-RESPONSE");
 if (receipt) console.log("settlement:", JSON.stringify(http.getPaymentSettleResponse((n) => paid.headers.get(n))));
+if (paid.status !== 200) console.log("body:", body.slice(0, 300));
 try {
   const v = JSON.parse(body);
   console.log(`verdict: ${v.verdict} score=${v.score} — ${v.summary}`);

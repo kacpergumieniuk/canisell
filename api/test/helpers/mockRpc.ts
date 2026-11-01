@@ -12,6 +12,10 @@ export interface MockSpec {
   storage?: (address: string, slot: string) => Hex;
   logs?: (filter: any) => any[];
   txCount?: number;
+  /** Never answer this request (a hung RPC connection). */
+  hang?: (method: string, params: any) => boolean;
+  /** Fail this request at the transport level (HTTP 429/502-style), as opposed to an on-chain revert. */
+  fail?: (method: string, params: any) => boolean;
 }
 
 export const ZERO_WORD = ("0x" + "0".repeat(64)) as Hex;
@@ -21,9 +25,12 @@ export const sel = (signature: string) => toFunctionSelector(signature);
 export function mockClient(spec: MockSpec, log: Array<{ method: string; params: any }> = []): PublicClient {
   return createPublicClient({
     chain: base,
-    transport: custom({
+    transport: custom(
+      {
       async request({ method, params }: { method: string; params: any }) {
         log.push({ method, params });
+        if (spec.hang?.(method, params)) await new Promise(() => {});
+        if (spec.fail?.(method, params)) throw Object.assign(new Error("HTTP request failed: 429 Too Many Requests"), { code: -32005, status: 429 });
         switch (method) {
           case "eth_chainId":
             return "0x2105";
@@ -47,7 +54,9 @@ export function mockClient(spec: MockSpec, log: Array<{ method: string; params: 
             throw new Error(`mockRpc: unsupported method ${method}`);
         }
       },
-    }),
+    },
+      { retryCount: 0 }, // a mocked revert is final; do not let viem back off and retry it
+    ),
   }) as PublicClient;
 }
 

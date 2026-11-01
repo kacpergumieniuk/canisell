@@ -70,6 +70,22 @@ export function requireSettlement(inner: MiddlewareHandler): MiddlewareHandler {
   };
 }
 
+/**
+ * Cheap local plausibility check of a payment header (no signature verification, no network): base64 JSON naming this
+ * service's network and payee. It only gates *speculative* engine starts; the facilitator still verifies and settles.
+ */
+export function plausiblePayment(header: string | undefined, cfg: Pick<Config, "network" | "payTo">): boolean {
+  if (!header || header.length > 16_384) return false;
+  try {
+    const json = JSON.parse(typeof atob === "function" ? atob(header) : Buffer.from(header, "base64").toString("utf8"));
+    const accepted = json?.accepted ?? json;
+    const payTo = String(accepted?.payTo ?? json?.payload?.authorization?.to ?? "").toLowerCase();
+    return String(accepted?.network) === cfg.network && payTo === cfg.payTo.toLowerCase() && typeof json?.payload === "object" && json.payload !== null;
+  } catch {
+    return false;
+  }
+}
+
 /** Hono context of the request that triggered an x402 hook (carried in the transport context). */
 function timingOf(ctx: unknown): Timings | undefined {
   return (ctx as { transportContext?: { request?: { adapter?: { c?: { get(k: string): unknown } } } } })?.transportContext?.request?.adapter?.c?.get("timing") as

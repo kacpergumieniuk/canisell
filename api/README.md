@@ -32,15 +32,30 @@ All optional; the defaults give a working Base Sepolia (testnet payments) setup.
 | `FACILITATOR_URL` | from `FACILITATOR` | Override the facilitator URL |
 | `PAY_TO` | owner wallet in `src/config.ts` | Address that receives USDC |
 | `PRICE_SINGLE` / `PRICE_BATCH` | `$0.01` / `$0.05` | Prices |
-| `RPC_URL` | `https://base-rpc.publicnode.com` | Base mainnet RPC (needs state-override `eth_call`) |
-| `ARCHIVE_RPC_URL` | `https://mainnet.base.org` | Archive `eth_getCode` for token age |
-| `LOGS_RPC_URL` | `https://base-rpc.publicnode.com` | RPC that allows `eth_getLogs` |
+| `RPC_URL` | nodies, blastapi, publicnode | Base mainnet RPC(s), comma-separated, tried in order (needs state-override `eth_call` and Multicall3) |
+| `ARCHIVE_RPC_URL` | same list + `mainnet.base.org` | Archive `eth_getCode` for token age |
+| `LOGS_RPC_URL` | `https://base-rpc.publicnode.com` | RPC that allows a 10k-block `eth_getLogs` range |
 | `SIM_USD` | `20` | USD size of the simulated buy |
 | `CACHE_TTL_SECONDS` | `60` | Per-address result cache |
 | `PUBLIC_BASE_URL` | unset | Public origin used in Bazaar metadata |
 | `PORT` | `8787` | Local Node server only |
 
 Token data always comes from Base mainnet; `X402_NETWORK` only selects where payments settle.
+
+## Latency
+
+A paid call is facilitator verify, the engine, then facilitator settle; the verdict is released only after settle. Every response carries a `Server-Timing` header (`verify`, `settle`, and the engine phases `head`, `contract`, `age`, `pools`, `analyze`, `sim`, `creator`, `creator_history`, plus `cache;desc="miss|memory|shared|edge"`), and every payment attempt writes one JSON log line (`evt: "paid_request"`, with the same phases, upstream RPC request counts and the settlement outcome). Slow, rate-limited or failed upstream RPC requests log `evt: "rpc_slow_or_failed"` (the URL is never logged).
+
+How it stays fast:
+
+- The engine starts as soon as a request arrives with a plausible payment header, in parallel with the facilitator's `verify`; the handler reuses that run. Unpaid requests never start it.
+- Concurrent contract reads are packed into Multicall3 calls and the rest into JSON-RPC batches; independent phases run at once (contract facts, ETH price, pool discovery and the age search start together; the creator check runs alongside pool analysis and the simulation).
+- `RPC_URL` takes several endpoints. A 429 or timeout moves to the next one at once instead of backing off on the limited one. Free public RPCs throttle Cloudflare's egress IPs, so for steady traffic put a keyed endpoint first (`wrangler secret put RPC_URL`).
+- Verdicts are cached per address for `CACHE_TTL_SECONDS` in isolate memory and in the data center's Cache API; creation facts (age) for 24 h. Cached verdicts are still released only after settlement.
+- The v4 `Initialize` log scan is skipped when a launchpad (Clanker/Zora) pool is live; otherwise it starts from a coarse age answer instead of waiting for the exact creation block.
+- Optional checks are time-boxed and reported as unknown (`age_unknown`, `creator_unknown`, `creator_history_unknown`, listed in `meta.partial`) instead of delaying the answer; the buy/sell simulation is never skipped or shortened. A transport failure (rate limit, timeout) while reading the token or looking up pools is an upstream error (502, not charged), never "not an ERC-20" or "no pool".
+
+`npx tsx scripts/profile.ts 0xToken` prints every upstream RPC request and the engine phases (no payment needed); `scripts/paid-smoke.ts` prints the paid call's timings and `Server-Timing`.
 
 ## Run locally
 

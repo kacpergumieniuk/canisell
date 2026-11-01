@@ -1,14 +1,15 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Address } from "viem";
-import { TtlCache } from "./cache.ts";
+import { TtlCache, workersEdgeCache } from "./cache.ts";
 import { makeClients, type Clients } from "./chain/client.ts";
+import { requestTiming } from "./chain/trace.ts";
 import type { Config } from "./config.ts";
 import { registerDiscovery } from "./discovery.ts";
 import { checkToken, DISCLAIMER, ENGINE_VERSION, InputError, parseTokenAddress, type VerdictResponse } from "./risk/verdict.ts";
 import { SAMPLE_VERDICT } from "./sample.ts";
 import { Timings } from "./timing.ts";
-import { BATCH_DESCRIPTION, lazyPaymentMiddleware, SERVICE_NAME, SINGLE_DESCRIPTION } from "./x402.ts";
+import { BATCH_DESCRIPTION, lazyPaymentMiddleware, plausiblePayment, SERVICE_NAME, SINGLE_DESCRIPTION } from "./x402.ts";
 
 declare module "hono" {
   interface ContextVariableMap {
@@ -24,6 +25,8 @@ export interface AppDeps {
   /** Override for tests: replace the x402 middleware. */
   payment?: import("hono").MiddlewareHandler;
   clients?: Clients;
+  /** Override for tests: stand-in for caches.default. */
+  edgeStore?: Pick<Cache, "match" | "put">;
 }
 
 function errorStatus(e: unknown): 400 | 422 | 502 {
@@ -33,19 +36,49 @@ function errorStatus(e: unknown): 400 | 422 | 502 {
 
 export function createApp(cfg: Config, deps: AppDeps = {}) {
   const clients = deps.clients ?? makeClients(cfg);
-  const cache = new TtlCache<VerdictResponse>(cfg.cacheTtlSeconds * 1000);
-  const check =
-    deps.check ??
-    (async (address: Address, timing?: Timings) => {
-      const hit = cache.get(address);
-      if (hit) {
-        if (timing) timing.info.cache = "hit";
-        return hit;
+  const memory = new TtlCache<VerdictResponse>(cfg.cacheTtlSeconds * 1000);
+  const edge = workersEdgeCache<VerdictResponse>(cfg.cacheTtlSeconds, `verdict-v${ENGINE_VERSION}`, deps.edgeStore);
+  /** One computation per address at a time: a speculative start and the real request share it. */
+  const inflight = new Map<string, Promise<VerdictResponse>>();
+  const MAX_INFLIGHT = 16;
+
+  /**
+   * Verdict lookup, cheapest first: this isolate's memory, a computation already running for the address,
+   * the data center's Cache API, then the engine. Only successes are cached.
+   */
+  const lookup = (address: Address, timing?: Timings): Promise<VerdictResponse> => {
+    const hit = memory.get(address);
+    if (hit) {
+      if (timing) timing.info.cache ??= "memory";
+      return Promise.resolve(hit);
+    }
+    const running = inflight.get(address);
+    if (running) {
+      if (timing) timing.info.cache ??= "shared";
+      return running;
+    }
+    const compute = (async () => {
+      const shared = cfg.cacheTtlSeconds > 0 ? await edge.get(address) : undefined;
+      if (shared) {
+        if (timing) timing.info.cache = "edge";
+        memory.set(address, shared);
+        return shared;
       }
+      if (timing) timing.info.cache = "miss";
       const v = await checkToken(clients, address, { simUsd: cfg.simUsd, timing });
-      cache.set(address, v);
+      memory.set(address, v);
+      if (cfg.cacheTtlSeconds > 0) timing?.background.push(edge.put(address, v));
       return v;
-    });
+    })().finally(() => inflight.delete(address));
+    inflight.set(address, compute);
+    return compute;
+  };
+  const check = deps.check ?? lookup;
+  /** Start the engine early for a request that carries a plausible payment (see the speculation middleware). */
+  const prefetch = deps.check ? undefined : (address: Address, timing: Timings) => {
+    if (memory.get(address) || inflight.has(address) || inflight.size >= MAX_INFLIGHT) return;
+    lookup(address, timing).catch(() => {});
+  };
   const payment = deps.payment ?? lazyPaymentMiddleware(cfg);
 
   const app = new Hono();
@@ -54,9 +87,24 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
   app.use("*", async (c, next) => {
     const timing = new Timings();
     c.set("timing", timing);
-    await next();
+    await requestTiming.run(timing, next);
     c.header("Server-Timing", timing.header());
+    if (timing.background.length) {
+      try {
+        c.executionCtx.waitUntil(Promise.allSettled(timing.background));
+      } catch {
+        // not running in a Worker (Node, tests): the writes simply finish on their own
+      }
+    }
     if (c.req.path.startsWith("/v1/verdict/") && (c.req.header("payment-signature") || c.req.header("x-payment"))) {
+      // Why a payment was not settled (facilitator reason code only; no payer, no signature).
+      try {
+        const receipt = JSON.parse(atob(c.res.headers.get("PAYMENT-RESPONSE") ?? ""));
+        timing.info.settled = receipt.success === true;
+        if (receipt.success !== true) timing.info.settleError = String(receipt.errorReason ?? receipt.error ?? "unknown").slice(0, 80);
+      } catch {
+        // no receipt: payment rejected before settlement or handler error
+      }
       console.log(JSON.stringify({ evt: "paid_request", path: c.req.path, status: c.res.status, ...timing.toJSON(), ...timing.info }));
     }
   });
@@ -81,13 +129,25 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
     }),
   );
 
+  /** Whether the runtime really stores Cache API entries (probed once per isolate). */
+  let cacheProbe: Promise<boolean> | undefined;
+  const edgeCacheWorks = () =>
+    (cacheProbe ??= (async () => {
+      const probe = workersEdgeCache<{ ok: true }>(60, "health-probe", deps.edgeStore);
+      await probe.put("probe", { ok: true });
+      return (await probe.get("probe"))?.ok === true;
+    })());
+
   app.get("/v1/health", async (c) => {
     const started = Date.now();
     const block = await Promise.race([
       clients.rpc.getBlockNumber().then(Number).catch(() => null),
       new Promise<null>((r) => setTimeout(() => r(null), 3000)),
     ]);
-    return c.json({ ok: block !== null, block, rpcLatencyMs: Date.now() - started, network: cfg.network, engine: ENGINE_VERSION }, block !== null ? 200 : 503);
+    return c.json(
+      { ok: block !== null, block, rpcLatencyMs: Date.now() - started, network: cfg.network, engine: ENGINE_VERSION, cacheApi: await edgeCacheWorks() },
+      block !== null ? 200 : 503,
+    );
   });
 
   app.get("/v1/sample", (c) => c.json(SAMPLE_VERDICT));
@@ -102,6 +162,17 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
       parseTokenAddress(raw);
     } catch (e) {
       return c.json({ error: (e as Error).message }, 400);
+    }
+    return next();
+  });
+  // Pre-compute during verification. A request that already carries a plausible payment for this service starts the
+  // engine now, so the verdict is ready (or nearly) by the time the facilitator has verified the payment instead
+  // of starting after it. The handler still only runs, and the response is still only released, after verify AND
+  // settle; this only moves the engine's start earlier. Unpaid requests never trigger it, and the check is local
+  // (a forged header can still start one cached, deduplicated, capped engine run per address).
+  app.get("/v1/verdict/:address", async (c, next) => {
+    if (prefetch && plausiblePayment(c.req.header("payment-signature") ?? c.req.header("x-payment"), cfg)) {
+      prefetch(parseTokenAddress(c.req.param("address")), c.get("timing"));
     }
     return next();
   });

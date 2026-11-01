@@ -29,16 +29,58 @@ function slotToAddress(v: Hex | undefined): Address | undefined {
   return getAddress("0x" + v.slice(-40));
 }
 
-async function tryRead<T>(p: Promise<T>): Promise<T | undefined> {
+/**
+ * A read that may legitimately fail on-chain (function missing -> revert / empty return) yields undefined.
+ * Transport failures (rate limit, timeout, bad gateway) are rethrown instead: swallowing them would turn
+ * "the RPC is flaky" into "this token has no owner()" or "is not an ERC-20", i.e. a wrong verdict.
+ */
+export async function tryRead<T>(p: Promise<T>): Promise<T | undefined> {
   try {
     return await p;
-  } catch {
-    return undefined;
+  } catch (e) {
+    if (isOnChainFailure(e)) return undefined;
+    throw e;
   }
 }
 
+/** True when the call itself ran and reverted / returned nothing, as opposed to never reaching a node. */
+export function isOnChainFailure(e: unknown): boolean {
+  const err = e as { walk?: (fn: (e: unknown) => boolean) => unknown; name?: string; message?: string };
+  if (typeof err?.walk === "function") {
+    const hit = err.walk((x) => {
+      const n = (x as { name?: string })?.name;
+      return n === "ContractFunctionRevertedError" || n === "ContractFunctionZeroDataError" || n === "ExecutionRevertedError" || n === "RawContractError";
+    });
+    if (hit) return true;
+    // Anything else wrapped by viem (HttpRequestError, TimeoutError, RpcRequestError, ...) is transport trouble.
+    return false;
+  }
+  return /revert|execution reverted/i.test(err?.message ?? "");
+}
+
 export async function inspectContract(client: PublicClient, token: Address): Promise<ContractFacts> {
-  const code = (await client.getCode({ address: token })) ?? "0x";
+  // Code and every getter start together (one round trip; JSON-RPC batching and Multicall3 do the packing).
+  // For an address without code the getters are wasted, which only matters for invalid input.
+  const quiet = <X>(p: Promise<X>) => (p.catch(() => {}), p);
+  const codeP = quiet(client.getCode({ address: token }));
+  const read = <T>(abi: any, functionName: string) =>
+    quiet(tryRead(client.readContract({ address: token, abi, functionName }) as Promise<T>));
+  const slot = (s: Hex) => quiet(tryRead(client.getStorageAt({ address: token, slot: s })));
+  const reads = [
+    read<string>(ERC20_ABI, "name"),
+    read<string>(ERC20_ABI, "symbol"),
+    read<number>(ERC20_ABI, "decimals"),
+    read<bigint>(ERC20_ABI, "totalSupply"),
+    read<Address>(OWNER_ABI, "owner"),
+    read<Address>(OWNER_ABI, "getOwner"),
+    read<Address>(OWNER_ABI, "admin"),
+    slot(SLOTS.eip1967Impl),
+    slot(SLOTS.eip1967Admin),
+    slot(SLOTS.eip1967Beacon),
+    slot(SLOTS.zeppelinosImpl),
+  ] as const;
+
+  const code = (await codeP) ?? "0x";
   const facts: ContractFacts = {
     isContract: code !== "0x",
     codeSize: code === "0x" ? 0 : size(code),
@@ -48,24 +90,19 @@ export async function inspectContract(client: PublicClient, token: Address): Pro
   };
   if (!facts.isContract) return facts;
 
-  const read = <T>(abi: any, functionName: string) =>
-    tryRead(client.readContract({ address: token, abi, functionName }) as Promise<T>);
-  const slot = (s: Hex) => tryRead(client.getStorageAt({ address: token, slot: s }));
-
-  const [name, symbol, decimals, totalSupply, owner, getOwner, admin, impl, adminSlot, beacon, zos] =
-    await Promise.all([
-      read<string>(ERC20_ABI, "name"),
-      read<string>(ERC20_ABI, "symbol"),
-      read<number>(ERC20_ABI, "decimals"),
-      read<bigint>(ERC20_ABI, "totalSupply"),
-      read<Address>(OWNER_ABI, "owner"),
-      read<Address>(OWNER_ABI, "getOwner"),
-      read<Address>(OWNER_ABI, "admin"),
-      slot(SLOTS.eip1967Impl),
-      slot(SLOTS.eip1967Admin),
-      slot(SLOTS.eip1967Beacon),
-      slot(SLOTS.zeppelinosImpl),
-    ]);
+  const [name, symbol, decimals, totalSupply, owner, getOwner, admin, impl, adminSlot, beacon, zos] = (await Promise.all(reads)) as [
+    string | undefined,
+    string | undefined,
+    number | undefined,
+    bigint | undefined,
+    Address | undefined,
+    Address | undefined,
+    Address | undefined,
+    Hex | undefined,
+    Hex | undefined,
+    Hex | undefined,
+    Hex | undefined,
+  ];
   Object.assign(facts, { name, symbol, decimals: decimals === undefined ? undefined : Number(decimals), totalSupply });
 
   const ownerPick: [Address | undefined, string][] = [

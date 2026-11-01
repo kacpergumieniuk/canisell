@@ -40,6 +40,27 @@ async function simCall<F extends "simV4" | "simV2" | "simV3" | "depthV4">(client
 export const toUnits = (raw: bigint, decimals: number) => Number(raw) / 10 ** decimals;
 export const fromUnits = (v: number, decimals: number) => BigInt(Math.floor(v * 10 ** Math.min(decimals, 18))) * 10n ** BigInt(Math.max(0, decimals - 18));
 
+/** Raw exit-liquidity reads for a pool (no dependence on quote metadata or price, so they run alongside them). */
+async function readDepth(client: PublicClient, pool: PoolRef, totalSupply: bigint) {
+  if (pool.kind === "uniswap-v4") {
+    const amt = totalSupply > INT128_MAX ? INT128_MAX : totalSupply;
+    const [quoteOut] = await simCall(client, "depthV4", [BASE.v4PoolManager, pool.key, pool.tokenIs0, amt]);
+    return { kind: "quote-out" as const, raw: quoteOut as bigint };
+  }
+  if (pool.kind === "uniswap-v3" || pool.kind === "aerodrome-cl") {
+    const raw = await client.readContract({ address: pool.quote, abi: ERC20_ABI, functionName: "balanceOf", args: [pool.id as Address] });
+    return { kind: "quote-balance" as const, raw };
+  }
+  const pair = pool.id as Address;
+  const [[r0, r1], supply, dead, zero] = await Promise.all([
+    client.readContract({ address: pair, abi: PAIR_ABI, functionName: "getReserves" }),
+    client.readContract({ address: pair, abi: PAIR_ABI, functionName: "totalSupply" }),
+    client.readContract({ address: pair, abi: PAIR_ABI, functionName: "balanceOf", args: [DEAD] }),
+    client.readContract({ address: pair, abi: PAIR_ABI, functionName: "balanceOf", args: [ZERO] }),
+  ]);
+  return { kind: "v2" as const, raw: pool.tokenIs0 ? r1 : r0, supply, burned: dead + zero };
+}
+
 /** Adds quote metadata, USD price, exit-liquidity depth and LP status to a discovered pool. */
 export async function analyzePool(
   client: PublicClient,
@@ -48,7 +69,12 @@ export async function analyzePool(
   totalSupply: bigint,
   prices: PriceBook,
 ): Promise<PoolFacts> {
-  const [meta, quoteUsd] = await Promise.all([prices.tokenMeta(pool.quote), prices.usdPrice(pool.quote)]);
+  // Depth reads start together with metadata and price: one round trip for the usual WETH/USDC/ETH quotes.
+  const depthP = readDepth(client, pool, totalSupply).then(
+    (d) => d,
+    () => undefined, // depth stays undefined
+  );
+  const [meta, quoteUsd, depth] = await Promise.all([prices.tokenMeta(pool.quote), prices.usdPrice(pool.quote), depthP]);
   const facts: PoolFacts = {
     ...pool,
     quoteSymbol: meta.symbol,
@@ -56,30 +82,12 @@ export async function analyzePool(
     quoteUsd,
     lp: { status: pool.launchpad ? "locked-by-launchpad" : "unknown" },
   };
-  try {
-    if (pool.kind === "uniswap-v4") {
-      const amt = totalSupply > INT128_MAX ? INT128_MAX : totalSupply;
-      const [quoteOut] = await simCall(client, "depthV4", [BASE.v4PoolManager, pool.key, pool.tokenIs0, amt]);
-      facts.depthQuote = toUnits(quoteOut as bigint, meta.decimals);
-    } else if (pool.kind === "uniswap-v3" || pool.kind === "aerodrome-cl") {
-      const bal = await client.readContract({ address: pool.quote, abi: ERC20_ABI, functionName: "balanceOf", args: [pool.id as Address] });
-      facts.depthQuote = toUnits(bal, meta.decimals);
-    } else {
-      const pair = pool.id as Address;
-      const [[r0, r1], supply, dead, zero] = await Promise.all([
-        client.readContract({ address: pair, abi: PAIR_ABI, functionName: "getReserves" }),
-        client.readContract({ address: pair, abi: PAIR_ABI, functionName: "totalSupply" }),
-        client.readContract({ address: pair, abi: PAIR_ABI, functionName: "balanceOf", args: [DEAD] }),
-        client.readContract({ address: pair, abi: PAIR_ABI, functionName: "balanceOf", args: [ZERO] }),
-      ]);
-      facts.depthQuote = toUnits(pool.tokenIs0 ? r1 : r0, meta.decimals);
-      if (supply > 0n) {
-        const burnedPct = Number(((dead + zero) * 10_000n) / supply) / 100;
-        facts.lp = { status: burnedPct >= 95 ? "burned" : "not-burned", burnedPct };
-      }
+  if (depth) {
+    facts.depthQuote = toUnits(depth.raw, meta.decimals);
+    if (depth.kind === "v2" && depth.supply > 0n) {
+      const burnedPct = Number((depth.burned * 10_000n) / depth.supply) / 100;
+      facts.lp = { status: burnedPct >= 95 ? "burned" : "not-burned", burnedPct };
     }
-  } catch {
-    // depth stays undefined
   }
   if (facts.depthQuote !== undefined && quoteUsd !== undefined) facts.depthUsd = facts.depthQuote * quoteUsd;
   return facts;

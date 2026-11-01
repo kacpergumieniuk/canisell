@@ -78,6 +78,8 @@ export function scoreToken(f: TokenFacts): Verdict {
     if (cr.holdingPct >= 20) add("creator_whale", "high", 20, `Creator holds ${cr.holdingPct.toFixed(1)}% of supply.`);
     else if (cr.holdingPct >= 5) add("creator_holds", "medium", 10, `Creator holds ${cr.holdingPct.toFixed(1)}% of supply.`);
   }
+  if (f.unknown?.includes("creator")) add("creator_unknown", "info", 0, "Creator checks (holdings, wallet age) did not finish in time: unknown.");
+  if (f.unknown?.includes("creator-history")) add("creator_history_unknown", "info", 0, "Creator's deploy history was not checked in time: unknown.");
   const deploys = cr.recentDirectDeploys;
   if (deploys && deploys.tokens >= 3)
     add("serial_deployer", "medium", 10, `Creator deployed ${deploys.tokens} other tokens in its last ${deploys.scannedNonces} transactions.`);
@@ -91,6 +93,7 @@ export function scoreToken(f: TokenFacts): Verdict {
     else if (age < 86400) add("age_day", "low", 5, `Token is ${fmtAge(age)} old.`);
     else add("age", "info", 0, `Token is ${fmtAge(age)} old.`);
   } else if (f.creation.olderThanDays) add("age_old", "info", 0, `Token is older than ${f.creation.olderThanDays} days.`);
+  else if (f.unknown?.includes("age")) add("age_unknown", "info", 0, "Token age could not be determined in time: unknown (it may be brand new).");
 
   // --- known blue chips
   if (f.knownAsset) {
