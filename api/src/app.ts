@@ -85,22 +85,12 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
     }
     return next();
   });
+  // An empty body goes on to the paywall, so discovery probes (x402scan) see the 402.
+  // Present but malformed bodies are rejected here, before anyone is asked to pay.
   app.post("/v1/verdict/batch", async (c, next) => {
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: 'Body must be JSON: {"addresses": ["0x..."]}' }, 400);
-    }
-    const list = (body as { addresses?: unknown })?.addresses;
-    if (!Array.isArray(list) || list.length === 0 || list.length > MAX_BATCH)
-      return c.json({ error: `"addresses" must be an array of 1-${MAX_BATCH} addresses` }, 400);
-    try {
-      list.forEach((a) => parseTokenAddress(String(a)));
-    } catch (e) {
-      return c.json({ error: (e as Error).message }, 400);
-    }
-    return next();
+    if ((await c.req.text()).trim() === "") return next();
+    const parsed = await parseBatch(c);
+    return "error" in parsed ? c.json({ error: parsed.error }, 400) : next();
   });
 
   app.use("/v1/verdict/*", payment);
@@ -116,8 +106,10 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
   });
 
   app.post("/v1/verdict/batch", async (c) => {
-    const { addresses } = (await c.req.json()) as { addresses: string[] };
-    const unique = [...new Set(addresses.map((a) => parseTokenAddress(a)))];
+    // Re-validated here because empty bodies skip the pre-paywall check; a 400 is never settled.
+    const parsed = await parseBatch(c);
+    if ("error" in parsed) return c.json({ error: parsed.error }, 400);
+    const unique = [...new Set(parsed.addresses)];
     const results: Array<VerdictResponse | { address: string; error: string; status: number }> = new Array(unique.length);
     let i = 0;
     const worker = async () => {
@@ -135,6 +127,23 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
     if (allInfraFailed) return c.json({ error: "Upstream RPC failure; you were not charged", results }, 502);
     return c.json({ results }, 200, { "Cache-Control": "no-store" });
   });
+
+  async function parseBatch(c: { req: { text(): Promise<string> } }): Promise<{ addresses: `0x${string}`[] } | { error: string }> {
+    let body: unknown;
+    try {
+      body = JSON.parse(await c.req.text());
+    } catch {
+      return { error: 'Body must be JSON: {"addresses": ["0x..."]}' };
+    }
+    const list = (body as { addresses?: unknown })?.addresses;
+    if (!Array.isArray(list) || list.length === 0 || list.length > MAX_BATCH)
+      return { error: `"addresses" must be an array of 1-${MAX_BATCH} addresses` };
+    try {
+      return { addresses: list.map((a) => parseTokenAddress(String(a))) };
+    } catch (e) {
+      return { error: (e as Error).message };
+    }
+  }
 
   app.notFound((c) => c.json({ error: "Not found", docs: "/" }, 404));
   app.onError((e, c) => (e instanceof InputError ? c.json({ error: e.message }, 400) : c.json({ error: "Internal error" }, 500)));
