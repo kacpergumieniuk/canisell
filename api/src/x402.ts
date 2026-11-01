@@ -49,6 +49,27 @@ export function paidRoutes(cfg: Config) {
 }
 
 /**
+ * Defence in depth around the x402 middleware. @x402/hono already buffers the handler response, settles
+ * through the facilitator and swaps in a 402 when settlement fails, so a 2xx only leaves it with a
+ * PAYMENT-RESPONSE header. This wrapper enforces that invariant: any non-error response on a paid route
+ * that does not carry a settlement receipt is replaced by a 402 without the body, whatever the cause.
+ */
+export function requireSettlement(inner: MiddlewareHandler): MiddlewareHandler {
+  return async (c, next) => {
+    // A middleware may return its response instead of assigning c.res (Hono does that after we return).
+    const returned = await inner(c, next);
+    if (returned instanceof Response) c.res = returned;
+    const res = c.res;
+    if (res && res.status < 400 && !res.headers.has("PAYMENT-RESPONSE")) {
+      c.res = new Response(JSON.stringify({ error: "Payment was not settled; no content served" }), {
+        status: 402,
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+      });
+    }
+  };
+}
+
+/**
  * Receive-only x402 middleware: verification and settlement are done by the facilitator,
  * so the server holds no keys. Built lazily on the first paid request so that Workers never
  * do I/O at global scope.
@@ -61,7 +82,7 @@ export function lazyPaymentMiddleware(cfg: Config): MiddlewareHandler {
         cfg.network,
         new ExactEvmScheme(),
       );
-      mw = paymentMiddleware(paidRoutes(cfg), server);
+      mw = requireSettlement(paymentMiddleware(paidRoutes(cfg), server));
     }
     return mw(c, next);
   };

@@ -15,8 +15,11 @@ Runs on Cloudflare Workers (Hono) and locally on Node.
 | GET | `/v1/sample` | free | Example response |
 | GET | `/v1/health` | free | RPC reachability |
 | GET | `/` | free | Service description |
+| GET | `/openapi.json` | free | OpenAPI 3.1, prices in `x-payment-info` (x402scan format) |
+| GET | `/.well-known/x402` | free | x402scan resource list (`version: 1`) |
+| GET | `/llms.txt` | free | Short plain-text description for LLM tools |
 
-Malformed requests get a 400 before the paywall; non-token addresses get 422 and failed checks are not settled (no charge). Prices are configurable (`PRICE_SINGLE`, `PRICE_BATCH`). Responses carry Bazaar discovery metadata so x402 Bazaar can index the service.
+Malformed requests get a 400 before the paywall; non-token addresses get 422 and failed checks are not settled (no charge). Prices are configurable (`PRICE_SINGLE`, `PRICE_BATCH`). Content is served only after the facilitator has verified and settled the payment: @x402/hono buffers the handler response, settles, and turns a failed settlement into a 402 with no body (`requireSettlement` in `src/x402.ts` enforces this as a second line of defence). Responses carry Bazaar discovery metadata so x402 Bazaar can index the service.
 
 ## Environment variables
 

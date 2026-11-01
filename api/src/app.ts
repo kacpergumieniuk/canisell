@@ -4,6 +4,7 @@ import type { Address } from "viem";
 import { TtlCache } from "./cache.ts";
 import { makeClients, type Clients } from "./chain/client.ts";
 import type { Config } from "./config.ts";
+import { registerDiscovery } from "./discovery.ts";
 import { checkToken, DISCLAIMER, ENGINE_VERSION, InputError, parseTokenAddress, type VerdictResponse } from "./risk/verdict.ts";
 import { SAMPLE_VERDICT } from "./sample.ts";
 import { BATCH_DESCRIPTION, lazyPaymentMiddleware, SERVICE_NAME, SINGLE_DESCRIPTION } from "./x402.ts";
@@ -52,6 +53,9 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
         { method: "POST", path: "/v1/verdict/batch", price: cfg.priceBatch, body: '{"addresses": ["0x...", ...]} (max 10)', description: BATCH_DESCRIPTION },
         { method: "GET", path: "/v1/sample", price: "free", description: "Cached example response" },
         { method: "GET", path: "/v1/health", price: "free" },
+        { method: "GET", path: "/openapi.json", price: "free", description: "OpenAPI 3.1 with prices (x-payment-info)" },
+        { method: "GET", path: "/.well-known/x402", price: "free", description: "x402 resource list for directories" },
+        { method: "GET", path: "/llms.txt", price: "free", description: "Plain-text description for LLMs" },
       ],
       disclaimer: DISCLAIMER,
     }),
@@ -67,6 +71,8 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
   });
 
   app.get("/v1/sample", (c) => c.json(SAMPLE_VERDICT));
+
+  registerDiscovery(app, cfg);
 
   // Validate before the paywall so malformed requests get a 400 instead of a 402.
   app.get("/v1/verdict/:address", async (c, next) => {
