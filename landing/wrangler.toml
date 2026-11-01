@@ -1,0 +1,11 @@
+# Static landing page for canisell.xyz (Workers static assets). Deploy: npx wrangler deploy
+name = "canisell-landing"
+compatibility_date = "2026-10-01"
+
+[assets]
+directory = "./site"
+
+routes = [
+  { pattern = "canisell.xyz", custom_domain = true },
+  { pattern = "www.canisell.xyz", custom_domain = true },
+]

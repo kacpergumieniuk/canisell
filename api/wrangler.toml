@@ -20,6 +20,9 @@ SIM_USD = "20"
 CACHE_TTL_SECONDS = "60"
 
 # Mainnet environment: `npx wrangler deploy --env production`
+[env.production]
+routes = [{ pattern = "api.canisell.xyz", custom_domain = true }]
+
 [env.production.vars]
 X402_NETWORK = "base"
 FACILITATOR = "payai"

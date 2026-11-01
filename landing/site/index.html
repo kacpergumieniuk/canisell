@@ -182,6 +182,7 @@ footer li { margin: 0 0 8px; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 @media print { .receipt { transform: none; } }
+[hidden]{display:none!important}
 </style>
 </head>
 <body>
@@ -192,7 +193,6 @@ footer li { margin: 0 0 8px; }
     <nav aria-label="Sections">
       <a href="#verdict">verdict</a>
       <a href="#quickstart">quickstart</a>
-      <a href="#mcp">mcp</a>
       <a href="#pricing">pricing</a>
       <a href="#limits">limits</a>
     </nav>
@@ -413,7 +413,7 @@ console.log(JSON.stringify(await res.json(), null, 2));</pre>
   </div>
 </section>
 
-<section id="mcp">
+<section id="mcp" hidden><!-- hidden until the canisell-mcp npm package is published -->
   <div class="wrap">
     <div class="sec-head"><div class="sec-no">04 / MCP</div><h2 class="t">Give Claude Desktop or Cursor a <span class="mono" style="font-size:.78em">check_base_token</span> tool</h2></div>
     <div class="sec-body">
@@ -443,7 +443,7 @@ console.log(JSON.stringify(await res.json(), null, 2));</pre>
 
 <section id="pricing">
   <div class="wrap">
-    <div class="sec-head"><div class="sec-no">05 / PRICING</div><h2 class="t">Pay for the calls you make. Nothing else.</h2></div>
+    <div class="sec-head"><div class="sec-no">04 / PRICING</div><h2 class="t">Pay for the calls you make. Nothing else.</h2></div>
     <div class="sec-body">
       <div class="price">
         <div><h3>One token</h3><div class="amt">$0.01<span>USDC</span></div><p><code>GET /v1/verdict/{address}</code></p></div>
@@ -456,7 +456,7 @@ console.log(JSON.stringify(await res.json(), null, 2));</pre>
 
 <section id="limits">
   <div class="wrap">
-    <div class="sec-head"><div class="sec-no">06 / LIMITS</div><h2 class="t">What this is not</h2></div>
+    <div class="sec-head"><div class="sec-no">05 / LIMITS</div><h2 class="t">What this is not</h2></div>
     <div class="sec-body">
       <ul class="list">
         <li><b>Heuristics, not advice.</b> The output is automated on-chain risk signals. It is not financial advice and not an audit. A SAFE verdict means no mechanical trap was detected at that block, not that the price will hold or that the token cannot be rugged later.</li>
@@ -485,7 +485,6 @@ console.log(JSON.stringify(await res.json(), null, 2));</pre>
         <li><a data-href="{{API_URL}}/v1/sample" href="#">/v1/sample</a> &middot; free example</li>
         <li><a data-href="{{API_URL}}/v1/health" href="#">/v1/health</a> &middot; status</li>
         <li><a data-href="{{API_URL}}/" href="#">/</a> &middot; service description</li>
-        <li><a data-href="{{REPO_URL}}" href="#">Source &amp; issues on GitHub</a></li>
         <li><a href="https://www.x402.org" rel="noopener">x402 protocol</a></li>
       </ul>
     </div>
@@ -496,8 +495,8 @@ console.log(JSON.stringify(await res.json(), null, 2));</pre>
 
 <script>
 // ---- CONFIG: the only place to edit before deploying ---------------------------------
-// PLACEHOLDERS: nothing below exists yet. Replace after the owner buys the domain,
-// deploys the Worker and publishes the npm package (see NAMES.md and listings/README.md).
+// API_URL is live. REPO_URL and MCP_PACKAGE are not public yet; the #mcp section and the repo link
+// stay hidden until they are (see listings/README.md).
 const CONFIG = {
   API_URL: "https://api.canisell.xyz",                       // base URL of the deployed Worker, no trailing slash
   REPO_URL: "https://github.com/kacpergumieniuk/canisell",   // public repo (MCP server + examples)
