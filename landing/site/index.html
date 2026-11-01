@@ -408,7 +408,7 @@ console.log(JSON.stringify(await res.json(), null, 2));</pre>
   -d '{"addresses": ["0xTOKEN1", "0xTOKEN2"]}'      <span class="dim"># same 402 flow; use `pay(url, { method: "POST", ... })`</span></pre>
         </div>
       </details>
-      <p class="cap">Malformed addresses get HTTP 400 before any payment is requested. Addresses that are not tokens get 422. Failed checks are not settled, so you are not charged for them.</p>
+      <p class="cap">Malformed addresses get HTTP 400 and addresses that are not tokens get 422. Failed checks are not settled, so you are not charged for them.</p>
     </div>
   </div>
 </section>

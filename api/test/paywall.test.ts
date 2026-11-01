@@ -158,14 +158,33 @@ describe("x402 gating: content only after verify AND settle (facilitator mocked)
     expect(state.handlerCalls).toBe(0);
   });
 
-  it("an empty batch probe gets the 402 (x402scan), a malformed body gets a 400", async () => {
+  it("unpaid requests always get the 402, even with a malformed address or body (x402scan probes literal {address})", async () => {
     stubFacilitator({ verify: verifyOk, settle: settleOk });
-    const { app } = makeApp();
+    const { app, state } = makeApp();
     const post = (body?: string) =>
       app.request("/v1/verdict/batch", { method: "POST", headers: { "content-type": "application/json" }, body });
     expect((await post()).status).toBe(402);
-    expect((await post("{not json")).status).toBe(400);
-    expect((await post(JSON.stringify({ addresses: [] }))).status).toBe(400);
+    expect((await post("{not json")).status).toBe(402);
+    expect((await post(JSON.stringify({ addresses: [] }))).status).toBe(402);
+    expect((await app.request("/v1/verdict/%7Baddress%7D")).status).toBe(402);
+    expect((await app.request("/v1/verdict/not-an-address")).status).toBe(402);
+    expect(state.handlerCalls).toBe(0);
+  });
+
+  it("a paid request with a malformed address gets a 400 and is never settled", async () => {
+    stubFacilitator({ verify: verifyOk, settle: settleOk });
+    const { app, state } = makeApp();
+    const client = new x402Client();
+    registerExactEvmScheme(client, { signer: privateKeyToAccount(generatePrivateKey()) });
+    const http = new x402HTTPClient(client);
+    const first = await app.request("/v1/verdict/not-an-address", { headers: { accept: "application/json" } });
+    expect(first.status).toBe(402);
+    const required = http.getPaymentRequiredResponse((n) => first.headers.get(n), await first.json());
+    const headers = http.encodePaymentSignatureHeader(await client.createPaymentPayload(required));
+    const r = await app.request("/v1/verdict/not-an-address", { headers: { accept: "application/json", ...headers } });
+    expect(r.status).toBe(400);
+    expect(calls).not.toContain("settle");
+    expect(state.handlerCalls).toBe(0);
   });
 
   it("a paid batch with an empty body gets a 400 and is never settled", async () => {

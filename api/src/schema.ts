@@ -3,6 +3,7 @@ export const ADDRESS_SCHEMA = {
   type: "string",
   pattern: "^0x[0-9a-fA-F]{40}$",
   description: "ERC-20 token contract address on Base mainnet (chain id 8453)",
+  example: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
 } as const;
 
 export const VERDICT_OUTPUT_SCHEMA = {

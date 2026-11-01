@@ -33,7 +33,7 @@ describe("discovery endpoints (free, no payment middleware involved)", () => {
     expect(doc.servers[0].url).toBe("http://api.test");
 
     const single = doc.paths["/v1/verdict/{address}"].get;
-    expect(single["x-payment-info"]).toMatchObject({ protocols: ["x402"], price: { mode: "fixed", currency: "USD", amount: "0.01" }, network: "eip155:84532" });
+    expect(single["x-payment-info"]).toMatchObject({ protocols: [{ x402: {} }], price: { mode: "fixed", currency: "USD", amount: "0.01" }, network: "eip155:84532" });
     expect(single.responses["402"]).toBeDefined();
     expect(single.parameters[0]).toMatchObject({ name: "address", in: "path", required: true });
     expect(single.security).toEqual([{ x402: [] }]);

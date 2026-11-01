@@ -25,6 +25,7 @@ workers_dev = true
 routes = [{ pattern = "api.canisell.xyz", custom_domain = true }]
 
 [env.production.vars]
+PUBLIC_BASE_URL = "https://api.canisell.xyz"
 X402_NETWORK = "base"
 FACILITATOR = "payai"
 PAY_TO = "0x741f78ED943C671e25405dAAaAB7b6886C7e8feb"

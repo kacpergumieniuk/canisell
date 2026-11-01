@@ -1,4 +1,6 @@
-# Listings kit (nothing here has been submitted)
+# Listings kit
+
+**Status 2026-11-01:** API live at https://api.canisell.xyz, landing at https://canisell.xyz. **x402scan: registered** (8/8 resources, merchant page tryponcho.com/m/api.canisell.xyz). Everything else below is not submitted yet.
 
 Everything is ready-to-paste text. Nothing was published, submitted, or deployed, and no PR was opened.
 The marketing rules from `DECISIONS.md` D11 apply to every text here: the account is labelled as a bot/automated, no spam (one submission per directory, one PR per list), we say "risk signals", and no text calls a specific token a scam.

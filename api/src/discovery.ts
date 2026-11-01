@@ -85,7 +85,7 @@ export function openApiDocument(cfg: Config, origin: string) {
     else if (e.path === "/llms.txt") responses["200"] = { description: "OK", content: { "text/plain": { schema: { type: "string" } } } };
     else responses["200"] = { description: "OK", content: json({ type: "object" }) };
     if (paid) {
-      responses["400"] = { description: "Malformed request (checked before payment)" };
+      responses["400"] = { description: "Malformed request; payment is not settled" };
       responses["402"] = { description: "Payment required (x402). Requirements are in the PAYMENT-REQUIRED header and body." };
       responses["422"] = { description: "Address is not a token contract; payment is not settled" };
       responses["502"] = { description: "Upstream RPC failure; payment is not settled" };
@@ -102,7 +102,7 @@ export function openApiDocument(cfg: Config, origin: string) {
     };
     if (paid) {
       op["x-payment-info"] = {
-        protocols: ["x402"],
+        protocols: [{ x402: {} }],
         price: { mode: "fixed", currency: "USD", amount: usdAmount(e.price!) },
         scheme: "exact",
         network: cfg.network,
@@ -110,6 +110,8 @@ export function openApiDocument(cfg: Config, origin: string) {
         payTo: cfg.payTo,
       };
       op.security = [{ x402: [] }];
+    } else {
+      op.security = [];
     }
     (paths[e.path] ??= {})[e.method] = op;
   }
@@ -154,7 +156,7 @@ Payment: x402, USDC on ${cfg.network}, scheme "exact". Call a paid endpoint with
 
 ## Notes
 - Token data always comes from Base mainnet; payments settle on ${cfg.network}.
-- Malformed requests return 400 before payment; non-token addresses return 422 and are not charged.
+- Malformed requests return 400 and non-token addresses return 422; neither is charged.
 `;
 }
 

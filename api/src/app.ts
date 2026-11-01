@@ -154,10 +154,14 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
 
   registerDiscovery(app, cfg);
 
-  // Validate before the paywall so malformed requests get a 400 instead of a 402.
+  // Unpaid requests always reach the paywall, so discovery probes (x402scan probes the literal "{address}") see the 402.
+  // A request that carries a payment is validated first: a malformed one gets a 400 and is never settled.
+  const hasPayment = (c: { req: { header(name: string): string | undefined } }) =>
+    Boolean(c.req.header("payment-signature") ?? c.req.header("x-payment"));
   app.get("/v1/verdict/:address", async (c, next) => {
     const raw = c.req.param("address");
     if (raw === "batch") return c.json({ error: "Use POST /v1/verdict/batch" }, 405);
+    if (!hasPayment(c)) return next();
     try {
       parseTokenAddress(raw);
     } catch (e) {
@@ -176,10 +180,9 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
     }
     return next();
   });
-  // An empty body goes on to the paywall, so discovery probes (x402scan) see the 402.
-  // Present but malformed bodies are rejected here, before anyone is asked to pay.
+  // Same for batch: unpaid requests get the 402; a paid request with a malformed body gets a 400 and is not settled.
   app.post("/v1/verdict/batch", async (c, next) => {
-    if ((await c.req.text()).trim() === "") return next();
+    if (!hasPayment(c)) return next();
     const parsed = await parseBatch(c);
     return "error" in parsed ? c.json({ error: parsed.error }, 400) : next();
   });
@@ -200,7 +203,6 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
   });
 
   app.post("/v1/verdict/batch", async (c) => {
-    // Re-validated here because empty bodies skip the pre-paywall check; a 400 is never settled.
     const parsed = await parseBatch(c);
     if ("error" in parsed) return c.json({ error: parsed.error }, 400);
     const unique = [...new Set(parsed.addresses)];
