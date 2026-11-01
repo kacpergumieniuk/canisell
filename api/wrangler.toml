@@ -21,6 +21,7 @@ CACHE_TTL_SECONDS = "60"
 
 # Mainnet environment: `npx wrangler deploy --env production`
 [env.production]
+workers_dev = true
 routes = [{ pattern = "api.canisell.xyz", custom_domain = true }]
 
 [env.production.vars]
