@@ -107,6 +107,8 @@ async function safe<T>(p: Promise<T>): Promise<T | undefined> {
 
 export interface Discovery {
   pools: PoolRef[];
+  /** false when a lookup failed, so "no pool" may be a false negative */
+  complete: boolean;
   launchpad?: Launchpad;
   launchpadCreator?: { address: Address; source: "zora-payout" | "clanker-admin" };
   errors: string[];
@@ -170,10 +172,14 @@ export async function discoverPools(
     ),
   );
 
+  // Scan v4 Initialize logs in the 10k blocks after creation; if the creation block is unknown
+  // (archive lookup failed), scan the latest 10k blocks, which covers launches up to ~5.5 h old.
   let logsP: Promise<PoolKeyV4[]> = Promise.resolve([]);
-  if (creation.createdBlock !== undefined && head - creation.createdBlock < LOG_MAX_AGE_BLOCKS) {
-    const fromBlock = BigInt(creation.createdBlock);
-    const toBlock = BigInt(Math.min(creation.createdBlock + LOG_WINDOW, head));
+  const knownAndRecent = creation.createdBlock !== undefined && head - creation.createdBlock < LOG_MAX_AGE_BLOCKS;
+  const unknownAge = creation.createdBlock === undefined && creation.olderThanDays === undefined;
+  if (knownAndRecent || unknownAge) {
+    const fromBlock = BigInt(knownAndRecent ? creation.createdBlock! : Math.max(0, head - LOG_WINDOW));
+    const toBlock = BigInt(knownAndRecent ? Math.min(creation.createdBlock! + LOG_WINDOW, head) : head);
     const q = (args: { currency0?: Address; currency1?: Address }) =>
       clients.logs.getLogs({ address: BASE.v4PoolManager, event: INITIALIZE_EVENT, args, fromBlock, toBlock });
     logsP = Promise.all([q({ currency0: token }), q({ currency1: token })])
@@ -204,7 +210,7 @@ export async function discoverPools(
     logsP,
   ]);
 
-  const out: Discovery = { pools: [], errors };
+  const out: Discovery = { pools: [], errors, complete: true };
   const candidates: PoolRef[] = [];
 
   if (zoraKey && BigInt(zoraKey.hooks) !== 0n) {
@@ -243,7 +249,9 @@ export async function discoverPools(
     });
   } catch (e) {
     errors.push(`v4 slot0 read failed: ${(e as Error).message?.slice(0, 120)}`);
+    out.complete = false;
   }
+  if (errors.some((e) => e.startsWith("v4 log scan failed"))) out.complete = false;
 
   const pushPair = (kind: PoolRef["kind"], addr: Address | undefined, q: Address) => {
     if (!addr || BigInt(addr) === 0n) return;

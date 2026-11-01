@@ -1,10 +1,11 @@
 import { getAddress, isAddress, type Address } from "viem";
+import { TtlCache } from "../cache.ts";
 import { BASE, ENTRY_POINTS, KNOWN_ASSETS } from "../chain/addresses.ts";
 import type { Clients } from "../chain/client.ts";
 import { findCreation } from "./age.ts";
 import { inspectContract } from "./contract.ts";
 import { inspectCreator } from "./creator.ts";
-import { discoverPools } from "./pools.ts";
+import { discoverPools, type Discovery } from "./pools.ts";
 import { ethUsd, PriceBook } from "./price.ts";
 import { scoreToken } from "./score.ts";
 import { analyzePool, pickPool, simulateRoundTrip } from "./simulate.ts";
@@ -20,6 +21,13 @@ export class InputError extends Error {
 export class NotTokenError extends Error {
   status = 422;
 }
+/** Upstream RPC trouble that would make the verdict unreliable: surfaced as 502 (and not charged). */
+export class UpstreamError extends Error {
+  status = 502;
+}
+
+// Creation facts never change: keep them for a day per isolate.
+const creationCache = new TtlCache<CreationFacts>(24 * 3600 * 1000, 2000);
 
 async function withTimeout<T>(p: Promise<T>, ms: number, label: string, errors: string[]): Promise<T | undefined> {
   let t: ReturnType<typeof setTimeout> | undefined;
@@ -81,18 +89,26 @@ export async function gatherFacts(clients: Clients, address: Address, opts: Chec
 
   const [contract, creation] = await Promise.all([
     inspectContract(rpc, address),
-    withTimeout(findCreation(clients.archive, clients.logs, address, head), 6_000, "age", errors).then((c) => c ?? {}),
+    creationCache.get(address)
+      ? Promise.resolve(creationCache.get(address)!)
+      : withTimeout(findCreation(clients.archive, clients.logs, address, head), 6_000, "age", errors).then((c) => {
+          if (c?.createdBlock !== undefined || c?.olderThanDays !== undefined) creationCache.set(address, c);
+          return c ?? {};
+        }),
   ]);
   if (!contract.isContract) throw new NotTokenError("Address has no contract code on Base");
   if (contract.decimals === undefined || contract.totalSupply === undefined)
     throw new NotTokenError("Contract does not implement ERC-20 decimals()/totalSupply()");
 
   const prices = new PriceBook(rpc, ethUsd(rpc));
-  const discovery = (await withTimeout(discoverPools(clients, address, creation, head), 6_000, "pools", errors)) ?? {
+  const discovery: Discovery = (await withTimeout(discoverPools(clients, address, creation, head), 6_000, "pools", errors)) ?? {
     pools: [],
     errors: [],
+    complete: false,
   };
   errors.push(...discovery.errors);
+  if (discovery.pools.length === 0 && !discovery.complete)
+    throw new UpstreamError(`Pool discovery incomplete (RPC errors), refusing to report "no pool": ${errors.join("; ").slice(0, 200)}`);
   const pools = (
     await Promise.all(
       discovery.pools.slice(0, 24).map((p) => withTimeout(analyzePool(rpc, p, address, contract.totalSupply!, prices), 5_000, `pool ${p.kind}`, errors)),
