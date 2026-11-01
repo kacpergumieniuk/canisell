@@ -115,6 +115,11 @@ describe("x402 gating: content only after verify AND settle (facilitator mocked)
     expect(((await r.json()) as VerdictResponse).summary).toBe(VERDICT_MARKER);
     const receipt = JSON.parse(Buffer.from(r.headers.get("payment-response")!, "base64").toString());
     expect(receipt).toMatchObject({ success: true, transaction: "0xabc" });
+    // phase timings ride along: facilitator verify and settle are measured by the x402 hooks
+    const st = r.headers.get("server-timing") ?? "";
+    expect(st).toMatch(/verify;dur=[\d.]+/);
+    expect(st).toMatch(/settle;dur=[\d.]+/);
+    expect(st).toMatch(/total;dur=[\d.]+/);
   });
 
   it("a handler error (>=400) is not settled", async () => {

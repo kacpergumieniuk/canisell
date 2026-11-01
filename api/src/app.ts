@@ -7,13 +7,20 @@ import type { Config } from "./config.ts";
 import { registerDiscovery } from "./discovery.ts";
 import { checkToken, DISCLAIMER, ENGINE_VERSION, InputError, parseTokenAddress, type VerdictResponse } from "./risk/verdict.ts";
 import { SAMPLE_VERDICT } from "./sample.ts";
+import { Timings } from "./timing.ts";
 import { BATCH_DESCRIPTION, lazyPaymentMiddleware, SERVICE_NAME, SINGLE_DESCRIPTION } from "./x402.ts";
+
+declare module "hono" {
+  interface ContextVariableMap {
+    timing: Timings;
+  }
+}
 
 export const MAX_BATCH = 10;
 
 export interface AppDeps {
   /** Override for tests. */
-  check?: (address: Address) => Promise<VerdictResponse>;
+  check?: (address: Address, timing?: Timings) => Promise<VerdictResponse>;
   /** Override for tests: replace the x402 middleware. */
   payment?: import("hono").MiddlewareHandler;
   clients?: Clients;
@@ -29,17 +36,30 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
   const cache = new TtlCache<VerdictResponse>(cfg.cacheTtlSeconds * 1000);
   const check =
     deps.check ??
-    (async (address: Address) => {
+    (async (address: Address, timing?: Timings) => {
       const hit = cache.get(address);
-      if (hit) return hit;
-      const v = await checkToken(clients, address, { simUsd: cfg.simUsd });
+      if (hit) {
+        if (timing) timing.info.cache = "hit";
+        return hit;
+      }
+      const v = await checkToken(clients, address, { simUsd: cfg.simUsd, timing });
       cache.set(address, v);
       return v;
     });
   const payment = deps.payment ?? lazyPaymentMiddleware(cfg);
 
   const app = new Hono();
-  app.use("*", cors({ origin: "*", exposeHeaders: ["PAYMENT-REQUIRED", "PAYMENT-RESPONSE", "X-PAYMENT-RESPONSE"] }));
+  app.use("*", cors({ origin: "*", exposeHeaders: ["PAYMENT-REQUIRED", "PAYMENT-RESPONSE", "X-PAYMENT-RESPONSE", "Server-Timing"] }));
+  // Phase timings: a Server-Timing header on every response and one JSON log line per payment attempt.
+  app.use("*", async (c, next) => {
+    const timing = new Timings();
+    c.set("timing", timing);
+    await next();
+    c.header("Server-Timing", timing.header());
+    if (c.req.path.startsWith("/v1/verdict/") && (c.req.header("payment-signature") || c.req.header("x-payment"))) {
+      console.log(JSON.stringify({ evt: "paid_request", path: c.req.path, status: c.res.status, ...timing.toJSON(), ...timing.info }));
+    }
+  });
 
   app.get("/", (c) =>
     c.json({
@@ -98,7 +118,10 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
   // Handlers. Any status >= 400 makes the x402 middleware skip settlement, so failed checks are not charged.
   app.get("/v1/verdict/:address", async (c) => {
     try {
-      const v = await check(parseTokenAddress(c.req.param("address")));
+      const timing = c.get("timing");
+      const v = await check(parseTokenAddress(c.req.param("address")), timing);
+      timing.info.verdict = v.verdict;
+      timing.info.partial = v.meta?.partial?.length;
       return c.json(v, 200, { "Cache-Control": "no-store" });
     } catch (e) {
       return c.json({ error: (e as Error).message?.slice(0, 300) }, errorStatus(e));
@@ -116,7 +139,7 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
       while (i < unique.length) {
         const idx = i++;
         try {
-          results[idx] = await check(unique[idx]);
+          results[idx] = await check(unique[idx], c.get("timing"));
         } catch (e) {
           results[idx] = { address: unique[idx], error: (e as Error).message?.slice(0, 300), status: errorStatus(e) };
         }

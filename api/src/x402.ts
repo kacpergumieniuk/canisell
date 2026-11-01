@@ -5,6 +5,7 @@ import { paymentMiddleware } from "@x402/hono";
 import type { MiddlewareHandler } from "hono";
 import type { Config } from "./config.ts";
 import { SAMPLE_VERDICT } from "./sample.ts";
+import type { Timings } from "./timing.ts";
 import { ADDRESS_SCHEMA, BATCH_INPUT_SCHEMA, BATCH_OUTPUT_SCHEMA, VERDICT_OUTPUT_SCHEMA } from "./schema.ts";
 
 export const SERVICE_NAME = "Base Launch-Token Verdict";
@@ -69,21 +70,53 @@ export function requireSettlement(inner: MiddlewareHandler): MiddlewareHandler {
   };
 }
 
+/** Hono context of the request that triggered an x402 hook (carried in the transport context). */
+function timingOf(ctx: unknown): Timings | undefined {
+  return (ctx as { transportContext?: { request?: { adapter?: { c?: { get(k: string): unknown } } } } })?.transportContext?.request?.adapter?.c?.get("timing") as
+    | Timings
+    | undefined;
+}
+
+/** Times the facilitator /supported call (once per isolate) so cold starts show up in the logs. */
+class TimedFacilitatorClient extends HTTPFacilitatorClient {
+  override async getSupported() {
+    const t = Date.now();
+    try {
+      return await super.getSupported();
+    } finally {
+      console.log(JSON.stringify({ evt: "facilitator_supported", ms: Date.now() - t }));
+    }
+  }
+}
+
+export type PaymentMiddleware = MiddlewareHandler & { warm(): void };
+
 /**
  * Receive-only x402 middleware: verification and settlement are done by the facilitator,
- * so the server holds no keys. Built lazily on the first paid request so that Workers never
- * do I/O at global scope.
+ * so the server holds no keys. Built lazily on the first request that needs it so that Workers never
+ * do I/O at global scope. `warm()` builds it (which starts the facilitator /supported fetch) ahead of the
+ * first paid request, e.g. from a health check.
  */
-export function lazyPaymentMiddleware(cfg: Config): MiddlewareHandler {
+export function lazyPaymentMiddleware(cfg: Config): PaymentMiddleware {
   let mw: MiddlewareHandler | undefined;
-  return (c, next) => {
+  const build = () => {
     if (!mw) {
-      const server = new x402ResourceServer(new HTTPFacilitatorClient({ url: cfg.facilitatorUrl, timeoutMs: 20_000 })).register(
+      const server = new x402ResourceServer(new TimedFacilitatorClient({ url: cfg.facilitatorUrl, timeoutMs: 20_000 })).register(
         cfg.network,
         new ExactEvmScheme(),
       );
+      // Phase timings for Server-Timing / logs: facilitator verify and settle are the two network round trips we do not control.
+      server.onBeforeVerify(async (ctx) => void timingOf(ctx)?.start("verify"));
+      server.onAfterVerify(async (ctx) => void timingOf(ctx)?.end("verify"));
+      server.onVerifyFailure(async (ctx) => void timingOf(ctx)?.end("verify"));
+      server.onBeforeSettle(async (ctx) => void timingOf(ctx)?.start("settle"));
+      server.onAfterSettle(async (ctx) => void timingOf(ctx)?.end("settle"));
+      server.onSettleFailure(async (ctx) => void timingOf(ctx)?.end("settle"));
       mw = requireSettlement(paymentMiddleware(paidRoutes(cfg), server));
     }
-    return mw(c, next);
+    return mw;
   };
+  const handler = ((c, next) => build()(c, next)) as PaymentMiddleware;
+  handler.warm = () => void build();
+  return handler;
 }

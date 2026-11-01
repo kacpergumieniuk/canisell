@@ -8,6 +8,7 @@ import { inspectCreator } from "./creator.ts";
 import { discoverPools, type Discovery } from "./pools.ts";
 import { ethUsd, PriceBook } from "./price.ts";
 import { scoreToken } from "./score.ts";
+import type { Timings } from "../timing.ts";
 import { analyzePool, pickPool, simulateRoundTrip } from "./simulate.ts";
 import type { CreationFacts, CreatorFacts, SimResult, TokenFacts, Verdict } from "./types.ts";
 
@@ -74,6 +75,8 @@ export interface VerdictResponse extends Verdict {
 
 export interface CheckOptions {
   simUsd: number;
+  /** Optional per-request phase timings (Server-Timing / logs). */
+  timing?: Timings;
 }
 
 export function parseTokenAddress(input: string): Address {
@@ -85,13 +88,15 @@ export function parseTokenAddress(input: string): Address {
 export async function gatherFacts(clients: Clients, address: Address, opts: CheckOptions): Promise<TokenFacts> {
   const { rpc } = clients;
   const errors: string[] = [];
-  const head = Number(await rpc.getBlockNumber());
+  const T = opts.timing;
+  const track = <X>(name: string, p: Promise<X>) => (T ? T.track(name, p) : p);
+  const head = Number(await track("head", rpc.getBlockNumber()));
 
   const [contract, creation] = await Promise.all([
-    inspectContract(rpc, address),
+    track("contract", inspectContract(rpc, address)),
     creationCache.get(address)
       ? Promise.resolve(creationCache.get(address)!)
-      : withTimeout(findCreation(clients.archive, clients.logs, address, head), 6_000, "age", errors).then((c) => {
+      : withTimeout(track("age", findCreation(clients.archive, clients.logs, address, head)), 6_000, "age", errors).then((c) => {
           if (c?.createdBlock !== undefined || c?.olderThanDays !== undefined) creationCache.set(address, c);
           return c ?? {};
         }),
@@ -101,7 +106,7 @@ export async function gatherFacts(clients: Clients, address: Address, opts: Chec
     throw new NotTokenError("Contract does not implement ERC-20 decimals()/totalSupply()");
 
   const prices = new PriceBook(rpc, ethUsd(rpc));
-  const discovery: Discovery = (await withTimeout(discoverPools(clients, address, creation, head), 6_000, "pools", errors)) ?? {
+  const discovery: Discovery = (await withTimeout(track("pools", discoverPools(clients, address, creation, head)), 6_000, "pools", errors)) ?? {
     pools: [],
     errors: [],
     complete: false,
@@ -110,8 +115,11 @@ export async function gatherFacts(clients: Clients, address: Address, opts: Chec
   if (discovery.pools.length === 0 && !discovery.complete)
     throw new UpstreamError(`Pool discovery incomplete (RPC errors), refusing to report "no pool": ${errors.join("; ").slice(0, 200)}`);
   const pools = (
-    await Promise.all(
-      discovery.pools.slice(0, 24).map((p) => withTimeout(analyzePool(rpc, p, address, contract.totalSupply!, prices), 5_000, `pool ${p.kind}`, errors)),
+    await track(
+      "analyze",
+      Promise.all(
+        discovery.pools.slice(0, 24).map((p) => withTimeout(analyzePool(rpc, p, address, contract.totalSupply!, prices), 5_000, `pool ${p.kind}`, errors)),
+      ),
     )
   ).filter((p) => p !== undefined);
 
@@ -124,12 +132,12 @@ export async function gatherFacts(clients: Clients, address: Address, opts: Chec
 
   const chosen = pickPool(pools);
   const simP: Promise<SimResult> = chosen
-    ? withTimeout(simulateRoundTrip(rpc, chosen, address, opts.simUsd), 6_000, "simulation", errors).then(
+    ? withTimeout(track("sim", simulateRoundTrip(rpc, chosen, address, opts.simUsd)), 6_000, "simulation", errors).then(
         (s) => s ?? { attempted: false, note: "simulation timed out or errored" },
       )
     : Promise.resolve({ attempted: false, note: pools.length ? "no simulatable pool (v2/v3 need a WETH pair)" : "no pool" });
   const creatorP = creator.address
-    ? withTimeout(inspectCreator(rpc, address, creator.address, contract.totalSupply!), 5_000, "creator", errors)
+    ? withTimeout(track("creator", inspectCreator(rpc, address, creator.address, contract.totalSupply!)), 5_000, "creator", errors)
     : Promise.resolve(undefined);
   const [sim, cr] = await Promise.all([simP, creatorP]);
   if (cr) Object.assign(creator, cr);

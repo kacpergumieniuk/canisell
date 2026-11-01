@@ -21,16 +21,20 @@ registerExactEvmScheme(client, { signer: account });
 const http = new x402HTTPClient(client);
 const url = `${api}/v1/verdict/${token}`;
 
+const t0 = Date.now();
 const first = await fetch(url, { headers: { accept: "application/json" } });
-console.log(`unpaid: ${first.status}`);
+console.log(`unpaid: ${first.status} in ${Date.now() - t0} ms`);
 if (first.status !== 402) throw new Error(`expected 402, got ${first.status}`);
+const tSign = Date.now();
 const required = http.getPaymentRequiredResponse((n) => first.headers.get(n), await first.json());
 const headers = http.encodePaymentSignatureHeader(await client.createPaymentPayload(required));
 
+console.log(`client: signing took ${Date.now() - tSign} ms`);
 const started = Date.now();
 const paid = await fetch(url, { headers: { accept: "application/json", ...headers } });
 const body = await paid.text();
 console.log(`paid: ${paid.status} in ${Date.now() - started} ms (payer ${account.address})`);
+console.log(`server-timing: ${paid.headers.get("Server-Timing") ?? "(none)"}`);
 const receipt = paid.headers.get("PAYMENT-RESPONSE");
 if (receipt) console.log("settlement:", JSON.stringify(http.getPaymentSettleResponse((n) => paid.headers.get(n))));
 try {
