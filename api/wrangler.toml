@@ -1,0 +1,31 @@
+name = "base-token-verdict"
+main = "src/worker.ts"
+compatibility_date = "2026-10-01"
+# @x402/hono uses Buffer during settlement
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Payments: "base-sepolia" (default, x402.org facilitator) or "base" (mainnet; FACILITATOR=payai|dexter)
+X402_NETWORK = "base-sepolia"
+PAY_TO = "0x741f78ED943C671e25405dAAaAB7b6886C7e8feb"
+PRICE_SINGLE = "$0.01"
+PRICE_BATCH = "$0.05"
+# Free public Base mainnet RPCs (token data always comes from Base mainnet)
+RPC_URL = "https://base-rpc.publicnode.com"
+ARCHIVE_RPC_URL = "https://mainnet.base.org"
+LOGS_RPC_URL = "https://base-rpc.publicnode.com"
+SIM_USD = "20"
+CACHE_TTL_SECONDS = "60"
+
+# Mainnet environment: `npx wrangler deploy --env production`
+[env.production.vars]
+X402_NETWORK = "base"
+FACILITATOR = "payai"
+PAY_TO = "0x741f78ED943C671e25405dAAaAB7b6886C7e8feb"
+PRICE_SINGLE = "$0.01"
+PRICE_BATCH = "$0.05"
+RPC_URL = "https://base-rpc.publicnode.com"
+ARCHIVE_RPC_URL = "https://mainnet.base.org"
+LOGS_RPC_URL = "https://base-rpc.publicnode.com"
+SIM_USD = "20"
+CACHE_TTL_SECONDS = "60"
