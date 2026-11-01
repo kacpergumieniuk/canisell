@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canisell: can your bot sell it? Pay-per-call risk verdicts for new Base tokens</title>
+<meta name="description" content="Pay-per-call API (x402, USDC) that returns a SAFE / CAUTION / DANGER verdict with reasons for new ERC-20 tokens on Base: sellability, taxes, owner powers, liquidity, token age. No accounts, no API keys. Also an MCP tool.">
+<meta property="og:title" content="Canisell: can your bot sell it?">
+<meta property="og:description" content="A SAFE / CAUTION / DANGER verdict with reasons for new Base tokens. $0.01 per check in USDC over x402. No accounts, no API keys.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#efeadf">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2314130f'/%3E%3Cpath d='M9 17.5l5 5 9-12' fill='none' stroke='%23efeadf' stroke-width='3.2' stroke-linecap='square'/%3E%3C/svg%3E">
+<!--
+  Canisell landing page. Single static file, no build step, no external requests.
+  Deploy: Cloudflare Pages, "Direct upload" of this folder (or a git-connected project with no build command and output dir "/").
+
+  BEFORE DEPLOYING: set the three values in CONFIG (bottom of the page). Every URL, curl line and config snippet
+  on the page is generated from them. "canisell", the domains and the npm package are PLACEHOLDERS until the owner
+  has bought/published them (see NAMES.md).
+-->
+<style>
+:root {
+  --paper: #efeadf;
+  --paper-2: #e7e1d3;
+  --ink: #14130f;
+  --ink-2: #3b382f;
+  --mute: #6d675a;
+  --rule: #cdc5b1;
+  --safe: #1b6e45;
+  --caution: #a8650a;
+  --danger: #a82a21;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font: 17px/1.55 var(--sans);
+  background-image: radial-gradient(rgba(20,19,15,.055) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+a:hover { text-decoration-thickness: 2px; }
+code, pre, .mono { font-family: var(--mono); }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+/* header */
+header.top { border-bottom: 1px solid var(--ink); }
+header.top .wrap { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; padding-top: 18px; padding-bottom: 14px; flex-wrap: wrap; }
+.brand { font-family: var(--serif); font-size: 26px; font-weight: 700; letter-spacing: -.01em; text-decoration: none; }
+.brand small { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--mute); margin-left: 12px; vertical-align: 3px; }
+nav a { font: 500 13px var(--mono); text-decoration: none; margin-left: 20px; color: var(--ink-2); }
+nav a:hover { color: var(--ink); text-decoration: underline; }
+
+/* hero */
+.hero { padding: 64px 0 72px; }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr); gap: 56px; align-items: start; }
+.eyebrow { font: 600 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--mute); margin: 0 0 22px; }
+h1 { font-family: var(--serif); font-weight: 700; font-size: clamp(40px, 6.2vw, 74px); line-height: .98; letter-spacing: -.025em; margin: 0 0 26px; }
+h1 em { font-style: italic; font-weight: 500; text-decoration: underline; text-decoration-color: rgba(168,42,33,.5); text-decoration-thickness: .07em; text-underline-offset: .12em; }
+.lede { font-size: 20px; line-height: 1.5; max-width: 34em; color: var(--ink-2); margin: 0 0 30px; }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn { display: inline-block; font: 600 14px var(--mono); padding: 13px 20px; border: 1.5px solid var(--ink); text-decoration: none; background: transparent; color: var(--ink); cursor: pointer; }
+.btn.solid { background: var(--ink); color: var(--paper); }
+.btn:hover { background: var(--ink); color: var(--paper); text-decoration: none; }
+.btn.solid:hover { background: #000; }
+.facts { margin: 34px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px 22px; font: 500 13px var(--mono); color: var(--mute); }
+.facts li::before { content: "+"; margin-right: 7px; color: var(--ink); }
+
+/* receipt */
+.receipt {
+  background: #fbf9f3; color: var(--ink); font: 13px/1.5 var(--mono);
+  padding: 26px 26px 30px; position: relative; transform: rotate(1.1deg);
+  box-shadow: 0 1px 0 rgba(20,19,15,.5), 8px 10px 0 -1px rgba(20,19,15,.09), 0 30px 50px -28px rgba(20,19,15,.5);
+  -webkit-mask: radial-gradient(circle 7px at 7px 100%, #0000 98%, #000) -7px 0 / 14px 100% repeat-x, linear-gradient(#000, #000);
+  -webkit-mask-composite: source-in;
+}
+.receipt::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 8px; background: repeating-linear-gradient(90deg, #fbf9f3 0 7px, transparent 7px 14px); }
+.receipt h2 { font: 700 12px var(--mono); letter-spacing: .14em; text-transform: uppercase; margin: 0 0 4px; }
+.receipt .sub { color: var(--mute); margin-bottom: 14px; }
+.receipt hr { border: 0; border-top: 1.5px dashed var(--rule); margin: 14px 0; }
+.stamp { display: flex; align-items: center; justify-content: space-between; }
+.stamp b { font: 700 40px/1 var(--serif); letter-spacing: .04em; color: var(--safe); border: 3px solid var(--safe); padding: 6px 12px 4px; transform: rotate(-3deg); display: inline-block; }
+.stamp span { text-align: right; color: var(--mute); }
+.stamp span strong { display: block; font: 700 34px/1 var(--mono); color: var(--ink); }
+.receipt dl { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 5px 14px; }
+.receipt dt { color: var(--ink-2); }
+.receipt dd { margin: 0; text-align: right; font-weight: 600; }
+.receipt .foot { color: var(--mute); font-size: 12px; }
+.receipt-note { font: 12px/1.5 var(--mono); color: var(--mute); margin: 22px 6px 0; max-width: 40em; }
+
+/* sections */
+section { padding: 72px 0; border-top: 1px solid var(--ink); }
+.sec-head { display: grid; grid-template-columns: 150px minmax(0,1fr); gap: 28px; margin-bottom: 36px; }
+.sec-no { font: 600 12px var(--mono); letter-spacing: .1em; color: var(--mute); padding-top: 14px; }
+h2.t { font-family: var(--serif); font-size: clamp(30px, 4vw, 46px); line-height: 1.05; letter-spacing: -.02em; margin: 0; font-weight: 700; max-width: 18em; }
+.sec-body { margin-left: 178px; }
+.prose { max-width: 40em; color: var(--ink-2); }
+.prose p { margin: 0 0 1em; }
+
+/* checks ledger */
+.ledger { width: 100%; border-collapse: collapse; }
+.ledger th, .ledger td { text-align: left; vertical-align: top; padding: 16px 18px 16px 0; border-top: 1px solid var(--rule); }
+.ledger tr:last-child td, .ledger tr:last-child th { border-bottom: 1px solid var(--rule); }
+.ledger th { font: 600 13px var(--mono); width: 210px; white-space: nowrap; }
+.ledger th i { font-style: normal; color: var(--mute); margin-right: 10px; }
+.ledger td { color: var(--ink-2); }
+
+/* verdict scale */
+.scale { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 0; border: 1.5px solid var(--ink); margin: 0 0 36px; }
+.scale > div { padding: 20px 22px 22px; border-right: 1.5px solid var(--ink); }
+.scale > div:last-child { border-right: 0; }
+.scale b { display: block; font: 700 28px/1 var(--serif); letter-spacing: .04em; margin-bottom: 8px; }
+.scale .s b { color: var(--safe); } .scale .c b { color: var(--caution); } .scale .d b { color: var(--danger); }
+.scale small { display: block; font: 600 12px var(--mono); color: var(--mute); margin-bottom: 8px; }
+.scale p { margin: 0; font-size: 15px; color: var(--ink-2); }
+
+/* code */
+.code { position: relative; background: var(--ink); color: #e9e4d6; border-radius: 0; margin: 0; }
+.code pre { margin: 0; padding: 22px 24px; overflow-x: auto; font-size: 13px; line-height: 1.6; tab-size: 2; }
+.code .bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px 8px 24px; border-bottom: 1px solid rgba(233,228,214,.18); font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #a8a393; }
+.copy { font: 600 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; background: transparent; color: #e9e4d6; border: 1px solid rgba(233,228,214,.4); padding: 5px 10px; cursor: pointer; }
+.copy:hover { background: #e9e4d6; color: var(--ink); }
+.k { color: #e6c07b; } .s { color: #a9c98a; } .n { color: #8fb7d9; } .c { color: #8a8576; font-style: italic; }
+.v-safe { color: #5fd08f; font-weight: 700; }
+.dim { color: #8a8576; }
+.json-wrap { max-height: 640px; overflow: auto; }
+.cap { font: 12px/1.5 var(--mono); color: var(--mute); margin: 12px 0 0; max-width: 60em; }
+
+/* steps */
+.steps { list-style: none; margin: 0 0 18px; padding: 0; counter-reset: step; }
+.steps li { counter-increment: step; display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 4px 12px; padding: 0 0 8px; color: var(--ink-2); font-size: 15px; }
+.steps li::before { content: counter(step); font: 700 13px var(--mono); border: 1.5px solid var(--ink); width: 26px; height: 26px; display: grid; place-items: center; color: var(--ink); }
+details { margin-top: 18px; }
+details summary { cursor: pointer; font: 600 13px var(--mono); }
+details .code { margin-top: 12px; }
+
+/* pricing */
+.price { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 0; border: 1.5px solid var(--ink); max-width: 760px; }
+.price > div { padding: 26px 28px 28px; }
+.price > div + div { border-left: 1.5px solid var(--ink); background: var(--paper-2); }
+.price .amt { font: 700 56px/1 var(--serif); letter-spacing: -.03em; }
+.price .amt span { font: 500 15px var(--mono); letter-spacing: 0; color: var(--mute); margin-left: 8px; }
+.price h3 { font: 600 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; margin: 0 0 14px; color: var(--mute); }
+.price p { margin: 12px 0 0; font-size: 15px; color: var(--ink-2); }
+.free { margin-top: 26px; max-width: 760px; font-size: 15px; color: var(--ink-2); }
+.free code { background: var(--paper-2); padding: 2px 6px; font-size: 13px; }
+.list { margin: 0; padding: 0; list-style: none; max-width: 760px; }
+.list li { padding: 12px 0 12px 28px; border-top: 1px solid var(--rule); position: relative; color: var(--ink-2); }
+.list li:last-child { border-bottom: 1px solid var(--rule); }
+.list li::before { content: "\2013"; position: absolute; left: 4px; font-family: var(--mono); color: var(--ink); }
+.list b { color: var(--ink); }
+
+/* footer */
+footer { border-top: 1px solid var(--ink); background: var(--ink); color: #cfc9b8; padding: 44px 0 52px; font-size: 14px; }
+footer .wrap { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); gap: 40px; }
+footer .brand { color: #efeadf; }
+footer a { color: #efeadf; }
+footer p { margin: 10px 0 0; max-width: 38em; }
+footer ul { list-style: none; padding: 0; margin: 0; font: 500 13px var(--mono); }
+footer li { margin: 0 0 8px; }
+.tiny { font: 12px/1.5 var(--mono); color: #8a8576; margin-top: 20px; }
+
+@media (max-width: 860px) {
+  .hero .wrap { grid-template-columns: 1fr; gap: 44px; }
+  .receipt { transform: none; max-width: 460px; }
+  .sec-head { grid-template-columns: 1fr; gap: 6px; }
+  .sec-body { margin-left: 0; }
+  .scale { grid-template-columns: 1fr; }
+  .scale > div { border-right: 0; border-bottom: 1.5px solid var(--ink); }
+  .scale > div:last-child { border-bottom: 0; }
+  .price { grid-template-columns: 1fr; }
+  .price > div + div { border-left: 0; border-top: 1.5px solid var(--ink); }
+  .ledger th { width: auto; white-space: normal; display: block; padding-bottom: 0; border: 0; }
+  .ledger td { display: block; border-top: 0 !important; padding-top: 4px; }
+  .ledger tr { display: block; border-top: 1px solid var(--rule); }
+  footer .wrap { grid-template-columns: 1fr; }
+  nav a { margin-left: 0; margin-right: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media print { .receipt { transform: none; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top">Canisell<small>for bots &amp; agents</small></a>
+    <nav aria-label="Sections">
+      <a href="#verdict">verdict</a>
+      <a href="#quickstart">quickstart</a>
+      <a href="#mcp">mcp</a>
+      <a href="#pricing">pricing</a>
+      <a href="#limits">limits</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+<div class="hero">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">Token risk API &middot; Base &middot; x402</p>
+      <h1>Can your bot <em>sell</em> it? Find out for one cent.</h1>
+      <p class="lede">Send a new ERC-20 address on Base, get back <b>SAFE</b>, <b>CAUTION</b> or <b>DANGER</b> with the reasons behind it. The check simulates a buy and a sell, reads the tax, the owner's powers, the liquidity and the token's age. You pay per call in USDC over x402: no account, no API key.</p>
+      <div class="cta">
+        <a class="btn solid" href="#quickstart">Quickstart</a>
+        <a class="btn" href="#verdict">See a real response</a>
+      </div>
+      <ul class="facts">
+        <li>$0.01 per check</li>
+        <li>$0.05 per batch of 10</li>
+        <li>MCP tool for Claude Desktop &amp; Cursor</li>
+      </ul>
+    </div>
+
+    <div>
+      <div class="receipt" role="img" aria-label="Example verdict receipt: SAFE, score 95 out of 100, for an established token">
+        <h2>Verdict receipt</h2>
+        <div class="sub">BRETT &middot; 0x532f&hellip;42E4 &middot; base</div>
+        <hr>
+        <div class="stamp"><b>SAFE</b><span>score<strong>95</strong></span></div>
+        <hr>
+        <dl>
+          <dt>Simulated buy / sell</dt><dd>both OK</dd>
+          <dt>Buy tax / sell tax</dt><dd>0% / 0%</dd>
+          <dt>Round trip cost</dt><dd>2.0%</dd>
+          <dt>Ownership</dt><dd>renounced</dd>
+          <dt>Upgradeable proxy</dt><dd>no</dd>
+          <dt>Exit liquidity</dt><dd>~$1.0M</dd>
+          <dt>LP lock</dt><dd>unknown</dd>
+          <dt>Token age</dt><dd>&gt; 30 days</dd>
+        </dl>
+        <hr>
+        <div class="foot">paid: $0.01 USDC &middot; x402<br>checked 2026-11-01 &middot; engine 0.1.0</div>
+      </div>
+      <p class="receipt-note">Taken from the free <code>/v1/sample</code> endpoint. It is an established token, so this is what a clean result looks like; the API is built for tokens that launched hours or days ago.</p>
+    </div>
+  </div>
+</div>
+
+<section id="checks">
+  <div class="wrap">
+    <div class="sec-head"><div class="sec-no">01 / CHECKS</div><h2 class="t">Five things a bot needs to know before it buys</h2></div>
+    <div class="sec-body">
+      <table class="ledger">
+        <tr><th><i>a</i>Can it be sold</th><td>A buy and a sell are simulated with <code>eth_call</code> state overrides against the best pool (Uniswap v2/v3/v4, Aerodrome). If the sell reverts, that is the strongest risk signal the API has.</td></tr>
+        <tr><th><i>b</i>Buy &amp; sell tax</th><td>Measured from the simulation, not read from the source. The round-trip loss (fees, hook taxes, slippage) is reported next to it.</td></tr>
+        <tr><th><i>c</i>Owner powers</th><td>Whether ownership is renounced, and whether the contract exposes mint, blacklist, pause, fee setters, trading switches or limit setters. Detects EIP-1967 and similar upgradeable proxies.</td></tr>
+        <tr><th><i>d</i>Liquidity</th><td>Exit depth in USD across pools, and whether the LP tokens are burned, locked by a known launchpad (Clanker, Zora), or unknown.</td></tr>
+        <tr><th><i>e</i>Token age</th><td>How long ago the contract was created, plus creator signals: share of supply held, repeat deployers, fresh wallets.</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="verdict">
+  <div class="wrap">
+    <div class="sec-head"><div class="sec-no">02 / VERDICT</div><h2 class="t">A label, a score, and the reasons in plain English</h2></div>
+    <div class="sec-body">
+      <div class="scale">
+        <div class="s"><b>SAFE</b><small>score 75&ndash;100</small><p>Buy and sell simulate cleanly and no abusive owner controls were found. It does not mean the price will hold.</p></div>
+        <div class="c"><b>CAUTION</b><small>score 45&ndash;74</small><p>Tradeable, but with risk signals such as taxes, active owner powers, thin liquidity or an upgradeable proxy.</p></div>
+        <div class="d"><b>DANGER</b><small>score below 45, or any critical signal</small><p>For example a failed simulated sell, a tax of 50% or more, or no pool on the supported DEXes.</p></div>
+      </div>
+
+      <div class="code">
+        <div class="bar"><span>GET /v1/sample &middot; free &middot; response, trimmed</span><button class="copy" type="button" data-copy="#sample-json">Copy</button></div>
+        <div class="json-wrap"><pre id="sample-json">{
+  <span class="k">"address"</span>: <span class="s">"0x532f27101965dd16442E59d40670FaF5eBB142E4"</span>,
+  <span class="k">"chain"</span>: <span class="s">"base"</span>,
+  <span class="k">"verdict"</span>: <span class="v-safe">"SAFE"</span>,
+  <span class="k">"score"</span>: <span class="n">95</span>,
+  <span class="k">"summary"</span>: <span class="s">"No blocking risks found: buy and sell simulate cleanly and no abusive owner controls detected."</span>,
+  <span class="k">"reasons"</span>: [
+    <span class="s">"LP lock status unknown (position NFT); liquidity may be removable."</span>,
+    <span class="s">"Buy and sell simulated OK; round trip costs 2.0%."</span>,
+    <span class="s">"Exit liquidity ~$1.0M."</span>,
+    <span class="s">"Ownership renounced."</span>,
+    <span class="s">"Token is older than 30 days."</span>
+  ],
+  <span class="k">"findings"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="s">"lp_unknown"</span>,
+      <span class="k">"severity"</span>: <span class="s">"low"</span>,
+      <span class="k">"penalty"</span>: <span class="n">5</span>,
+      <span class="k">"message"</span>: <span class="s">"LP lock status unknown (position NFT); liquidity may be removable."</span>
+    },
+    {
+      <span class="k">"id"</span>: <span class="s">"roundtrip_ok"</span>,
+      <span class="k">"severity"</span>: <span class="s">"info"</span>,
+      <span class="k">"penalty"</span>: <span class="n">0</span>,
+      <span class="k">"message"</span>: <span class="s">"Buy and sell simulated OK; round trip costs 2.0%."</span>
+    },
+    <span class="c">// 3 more findings omitted for display</span>
+  ],
+  <span class="k">"token"</span>: {
+    <span class="k">"name"</span>: <span class="s">"Brett"</span>,
+    <span class="k">"symbol"</span>: <span class="s">"BRETT"</span>,
+    <span class="k">"decimals"</span>: <span class="n">18</span>
+  },
+  <span class="k">"launchpad"</span>: <span class="n">null</span>,
+  <span class="k">"flags"</span>: {
+    <span class="k">"trading"</span>: {
+      <span class="k">"canBuy"</span>: <span class="n">true</span>,
+      <span class="k">"canSell"</span>: <span class="n">true</span>,
+      <span class="k">"buyTaxPct"</span>: <span class="n">0</span>,
+      <span class="k">"sellTaxPct"</span>: <span class="n">0</span>,
+      <span class="k">"roundTripLossPct"</span>: <span class="n">1.99</span>,
+      <span class="k">"poolKind"</span>: <span class="s">"uniswap-v3"</span>
+    },
+    <span class="k">"ownership"</span>: {
+      <span class="k">"owner"</span>: <span class="s">"0x0000000000000000000000000000000000000000"</span>,
+      <span class="k">"ownerSource"</span>: <span class="s">"owner()"</span>,
+      <span class="k">"renounced"</span>: <span class="n">true</span>,
+      <span class="k">"capabilities"</span>: {
+        <span class="k">"tradingToggle"</span>: [
+          <span class="s">"enableTrading()"</span>
+        ],
+        <span class="k">"feeExemption"</span>: [
+          <span class="s">"excludeFromFees(address,bool)"</span>
+        ]
+      },
+      <span class="k">"proxy"</span>: {
+        <span class="k">"kind"</span>: <span class="s">"none"</span>
+      }
+    },
+    <span class="k">"liquidity"</span>: {
+      <span class="k">"totalDepthUsd"</span>: <span class="n">1036551</span>,
+      <span class="k">"pools"</span>: [
+        {
+          <span class="k">"kind"</span>: <span class="s">"uniswap-v3"</span>,
+          <span class="k">"id"</span>: <span class="s">"0xBA3F945812a83471d709BCe9C3CA699A19FB46f7"</span>,
+          <span class="k">"quote"</span>: <span class="s">"0x4200000000000000000000000000000000000006"</span>,
+          <span class="k">"quoteSymbol"</span>: <span class="s">"WETH"</span>,
+          <span class="k">"depthQuote"</span>: <span class="n">303.785329</span>,
+          <span class="k">"depthUsd"</span>: <span class="n">688673</span>,
+          <span class="k">"lp"</span>: {
+            <span class="k">"status"</span>: <span class="s">"unknown"</span>
+          },
+          <span class="k">"source"</span>: <span class="s">"factory"</span>
+        },
+        <span class="c">// 7 more pools omitted for display</span>
+      ]
+    },
+    <span class="k">"creator"</span>: {},
+    <span class="k">"age"</span>: {
+      <span class="k">"olderThanDays"</span>: <span class="n">30</span>
+    }
+  },
+  <span class="k">"meta"</span>: {
+    <span class="k">"block"</span>: <span class="n">53369630</span>,
+    <span class="k">"checkedAt"</span>: <span class="s">"2026-11-01T10:23:28.499Z"</span>,
+    <span class="k">"latencyMs"</span>: <span class="n">1274</span>,
+    <span class="k">"engine"</span>: <span class="s">"0.1.0"</span>,
+    <span class="k">"partial"</span>: [],
+    <span class="k">"disclaimer"</span>: <span class="s">"Automated on-chain risk signals for Base, not financial advice. A SAFE verdict means no mechanical trap was detected, not that the price will hold."</span>
+  }
+}</pre></div>
+      </div>
+      <p class="cap">Real output of the free sample endpoint for an established token, checked 2026-11-01. Display-trimmed: some fields are removed and three findings and seven pools are left out. <code>reasons</code> is sorted most severe first; <code>findings</code> carries the same items with an <code>id</code>, a severity (critical, high, medium, low, info) and the score penalty. Batch calls return <code>{"results": [...]}</code> and report a per-address error instead of failing the whole call.</p>
+    </div>
+  </div>
+</section>
+
+<section id="quickstart">
+  <div class="wrap">
+    <div class="sec-head"><div class="sec-no">03 / QUICKSTART</div><h2 class="t">Three lines. The third one pays.</h2></div>
+    <div class="sec-body">
+      <div class="code">
+        <div class="bar"><span>shell</span><button class="copy" type="button" data-copy="#qs-shell">Copy</button></div>
+<pre id="qs-shell" data-tpl>curl {{API_URL}}/v1/sample                        <span class="dim"># 1. free: see the response shape</span>
+curl -i {{API_URL}}/v1/verdict/0xTOKEN            <span class="dim"># 2. HTTP 402 + USDC payment terms</span>
+node check.mjs 0xTOKEN                            <span class="dim"># 3. signs the 402, retries, prints the verdict</span></pre>
+      </div>
+      <ul class="steps" style="margin-top:20px">
+        <li><span>The sample and health endpoints need nothing.</span></li>
+        <li><span>The 402 response carries the price, the USDC asset on Base and the pay-to address in its <code>PAYMENT-REQUIRED</code> header (base64 JSON). Any x402 client can read it.</span></li>
+        <li><span><code>check.mjs</code> is the short script below. It uses the standard <code>@x402/fetch</code> client, so the wallet only signs a USDC transfer authorization for the exact price.</span></li>
+      </ul>
+      <details>
+        <summary>check.mjs (JavaScript, about 10 lines)</summary>
+        <div class="code">
+          <div class="bar"><span>check.mjs &middot; npm i @x402/fetch @x402/evm viem</span><button class="copy" type="button" data-copy="#qs-js">Copy</button></div>
+<pre id="qs-js" data-tpl>import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
+import { ExactEvmScheme } from "@x402/evm";
+import { privateKeyToAccount } from "viem/accounts";
+
+// use a dedicated wallet that holds a few dollars of USDC on Base
+const account = privateKeyToAccount(process.env.EVM_PRIVATE_KEY);
+const pay = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [{ network: "eip155:8453", client: new ExactEvmScheme(account) }],
+});
+
+const res = await pay(`{{API_URL}}/v1/verdict/${process.argv[2]}`);
+console.log(JSON.stringify(await res.json(), null, 2));</pre>
+        </div>
+      </details>
+      <details>
+        <summary>Batch: up to 10 addresses for $0.05</summary>
+        <div class="code">
+<pre data-tpl>curl -X POST {{API_URL}}/v1/verdict/batch \
+  -H 'content-type: application/json' \
+  -d '{"addresses": ["0xTOKEN1", "0xTOKEN2"]}'      <span class="dim"># same 402 flow; use `pay(url, { method: "POST", ... })`</span></pre>
+        </div>
+      </details>
+      <p class="cap">Malformed addresses get HTTP 400 before any payment is requested. Addresses that are not tokens get 422. Failed checks are not settled, so you are not charged for them.</p>
+    </div>
+  </div>
+</section>
+
+<section id="mcp">
+  <div class="wrap">
+    <div class="sec-head"><div class="sec-no">04 / MCP</div><h2 class="t">Give Claude Desktop or Cursor a <span class="mono" style="font-size:.78em">check_base_token</span> tool</h2></div>
+    <div class="sec-body">
+      <div class="prose">
+        <p>Claude Desktop and Cursor cannot pay x402 invoices themselves, so the MCP server acts as the payer: it signs from a wallet you give it and enforces a per-call cap. Without a wallet the tool does not fail silently; it returns the 402 payment terms instead of a verdict.</p>
+      </div>
+      <div class="code">
+        <div class="bar"><span>claude_desktop_config.json &middot; or ~/.cursor/mcp.json</span><button class="copy" type="button" data-copy="#mcp-json">Copy</button></div>
+<pre id="mcp-json" data-tpl>{
+  "mcpServers": {
+    "canisell": {
+      "command": "npx",
+      "args": ["-y", "{{MCP_PACKAGE}}"],
+      "env": {
+        "VERDICT_API_URL": "{{API_URL}}",
+        "EVM_PRIVATE_KEY": "0x...key of a dedicated, low-balance wallet",
+        "MAX_PAYMENT_USD": "0.05"
+      }
+    }
+  }
+}</pre>
+      </div>
+      <p class="cap">Use a throwaway wallet funded with a few dollars of USDC on Base, never your main one. The key stays in your client config; it is only used locally to sign payments. The tool takes one argument, the token address, and returns the verdict JSON. If <code>npx</code> is not on the app's PATH, use its absolute path.</p>
+    </div>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="wrap">
+    <div class="sec-head"><div class="sec-no">05 / PRICING</div><h2 class="t">Pay for the calls you make. Nothing else.</h2></div>
+    <div class="sec-body">
+      <div class="price">
+        <div><h3>One token</h3><div class="amt">$0.01<span>USDC</span></div><p><code>GET /v1/verdict/{address}</code></p></div>
+        <div><h3>Batch of up to 10</h3><div class="amt">$0.05<span>USDC</span></div><p><code>POST /v1/verdict/batch</code><br>$0.005 per token, duplicates removed.</p></div>
+      </div>
+      <p class="free"><b>Free:</b> <code>/</code> (service description), <code>/v1/health</code> (RPC reachability) and <code>/v1/sample</code> (example response). Payment is in USDC on Base through the x402 protocol: the server keeps no accounts or keys, a facilitator verifies and settles each payment. Results are cached for 60 seconds per address.</p>
+    </div>
+  </div>
+</section>
+
+<section id="limits">
+  <div class="wrap">
+    <div class="sec-head"><div class="sec-no">06 / LIMITS</div><h2 class="t">What this is not</h2></div>
+    <div class="sec-body">
+      <ul class="list">
+        <li><b>Heuristics, not advice.</b> The output is automated on-chain risk signals. It is not financial advice and not an audit. A SAFE verdict means no mechanical trap was detected at that block, not that the price will hold or that the token cannot be rugged later.</li>
+        <li><b>A snapshot.</b> An owner who keeps powers can change the token after the check. Re-check before large trades; results are cached for 60 seconds.</li>
+        <li><b>Base mainnet only</b> (chain 8453), and ERC-20 tokens traded on Uniswap v2/v3/v4 or Aerodrome pools. Tokens that trade elsewhere may show as having no pool.</li>
+        <li><b>The simulation is one size.</b> The buy is simulated at roughly $20. Large orders can face more slippage, and some Uniswap v4 hooks treat a same-transaction buy and sell differently from a later sale; those cases can produce false positives or false negatives.</li>
+        <li><b>Some facts are unknowable from the chain.</b> LP lock status is often "unknown" for position-NFT liquidity. Off-chain signals (team, social, off-DEX transfers) are not looked at.</li>
+        <li><b>Mechanics, not intent.</b> The API reports signals for an address. It does not say who is behind a token or whether anyone meant harm.</li>
+        <li><b>Early service.</b> Engine 0.1.0, one operator, no uptime guarantee. A free <code>/v1/health</code> endpoint shows whether the service can reach the chain.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a class="brand" href="#top">Canisell</a>
+      <p>A pay-per-call risk-signal API for new Base tokens, built for trading bots and AI agents. Automated service: responses are generated by software.</p>
+      <p class="tiny">Not financial advice. Risk signals are heuristics and can be wrong. Token names and symbols in examples are data returned by the chain, not endorsements or accusations.</p>
+    </div>
+    <div>
+      <ul>
+        <li><a data-href="{{API_URL}}/v1/sample" href="#">/v1/sample</a> &middot; free example</li>
+        <li><a data-href="{{API_URL}}/v1/health" href="#">/v1/health</a> &middot; status</li>
+        <li><a data-href="{{API_URL}}/" href="#">/</a> &middot; service description</li>
+        <li><a data-href="{{REPO_URL}}" href="#">Source &amp; issues on GitHub</a></li>
+        <li><a href="https://www.x402.org" rel="noopener">x402 protocol</a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+<noscript><div class="wrap" style="padding:16px 28px;font:13px var(--mono)">JavaScript is only used to fill in the API URL in the snippets and for the copy buttons. Replace <code>{{API_URL}}</code> with the service URL.</div></noscript>
+
+<script>
+// ---- CONFIG: the only place to edit before deploying ---------------------------------
+// PLACEHOLDERS: nothing below exists yet. Replace after the owner buys the domain,
+// deploys the Worker and publishes the npm package (see NAMES.md and listings/README.md).
+const CONFIG = {
+  API_URL: "https://api.canisell.xyz",                       // base URL of the deployed Worker, no trailing slash
+  REPO_URL: "https://github.com/kacpergumieniuk/canisell",   // public repo (MCP server + examples)
+  MCP_PACKAGE: "canisell-mcp",                               // npm package name of the MCP server
+};
+// ---------------------------------------------------------------------------------------
+
+(function () {
+  var fill = function (s) {
+    return s.replace(/\{\{(\w+)\}\}/g, function (m, k) { return CONFIG[k] !== undefined ? CONFIG[k] : m; });
+  };
+  document.querySelectorAll("[data-tpl]").forEach(function (el) {
+    // text nodes only, so the highlighted spans inside <pre> survive
+    var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), n;
+    while ((n = w.nextNode())) n.nodeValue = fill(n.nodeValue);
+  });
+  document.querySelectorAll("a[data-href]").forEach(function (a) {
+    a.href = fill(a.getAttribute("data-href"));
+    a.rel = "noopener";
+  });
+  document.querySelectorAll("button.copy").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var src = document.querySelector(b.getAttribute("data-copy"));
+      if (!src) return;
+      var text = src.textContent;
+      var done = function () { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1400); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () { b.textContent = "Select + copy"; });
+      } else { b.textContent = "Select + copy"; }
+    });
+  });
+})();
+</script>
+</body>
+</html>

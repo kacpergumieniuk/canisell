@@ -1,0 +1,46 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.kacpergumieniuk/canisell",
+  "description": "Pay-per-call (x402) SAFE/CAUTION/DANGER risk verdict for new ERC-20 tokens on Base.",
+  "repository": {
+    "url": "https://github.com/kacpergumieniuk/canisell",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "websiteUrl": "https://canisell.xyz",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "canisell-mcp",
+      "version": "0.1.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "VERDICT_API_URL",
+          "description": "Base URL of the Canisell API.",
+          "isRequired": true,
+          "format": "string",
+          "default": "https://api.canisell.xyz"
+        },
+        {
+          "name": "EVM_PRIVATE_KEY",
+          "description": "0x private key of a dedicated, low-balance wallet holding USDC on Base. Pays $0.01 per check via x402. Without it the tool returns the payment terms instead of a verdict.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "MAX_PAYMENT_USD",
+          "description": "Per-call spend cap in USD.",
+          "isRequired": false,
+          "format": "number",
+          "default": "0.05"
+        }
+      ]
+    }
+  ]
+}
