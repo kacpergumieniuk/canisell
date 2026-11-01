@@ -32,9 +32,9 @@ All optional; the defaults give a working Base Sepolia (testnet payments) setup.
 | `FACILITATOR_URL` | from `FACILITATOR` | Override the facilitator URL |
 | `PAY_TO` | owner wallet in `src/config.ts` | Address that receives USDC |
 | `PRICE_SINGLE` / `PRICE_BATCH` | `$0.01` / `$0.05` | Prices |
-| `RPC_URL` | nodies, blastapi, publicnode | Base mainnet RPC(s), comma-separated, tried in order (needs state-override `eth_call` and Multicall3) |
+| `RPC_URL` | nodies, blastapi, bloxroute, publicnode | Base mainnet RPC(s), comma-separated, tried in order (needs state-override `eth_call` and Multicall3) |
 | `ARCHIVE_RPC_URL` | same list + `mainnet.base.org` | Archive `eth_getCode` for token age |
-| `LOGS_RPC_URL` | `https://base-rpc.publicnode.com` | RPC that allows a 10k-block `eth_getLogs` range |
+| `LOGS_RPC_URL` | publicnode, bloxroute | RPC(s) that allow a 10k-block `eth_getLogs` range |
 | `SIM_USD` | `20` | USD size of the simulated buy |
 | `CACHE_TTL_SECONDS` | `60` | Per-address result cache |
 | `PUBLIC_BASE_URL` | unset | Public origin used in Bazaar metadata |

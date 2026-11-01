@@ -12,6 +12,9 @@ export interface Clients {
   logs: PublicClient;
 }
 
+// The logs endpoint is a single URL with no substitute (only publicnode serves a 10k-block range on a free tier), so it
+// backs off and retries (250, 500, 1000 ms) rather than failing the log scan on the first 429.
+
 /** Per-attempt timeout. Calls that matter (simulation) finish in well under a second on a healthy node. */
 const ATTEMPT_TIMEOUT_MS = 4_000;
 
@@ -29,31 +32,31 @@ export function splitUrls(value: string): string[] {
  * rate-limited one: free public RPCs throttle Cloudflare's shared egress IPs hard, and the viem default
  * (3 retries on the same URL with exponential backoff) turned a 100 ms call into 2-5 s.
  */
-export function makeTransport(urls: string[], label: string): Transport {
+export function makeTransport(urls: string[], label: string, singleUrlRetries = 1): Transport {
   const multi = urls.length > 1;
   const mk = (url: string, i: number) =>
     http(url, {
       batch: { batchSize: 25, wait: 4 },
       timeout: ATTEMPT_TIMEOUT_MS,
-      retryCount: multi ? 0 : 1,
-      retryDelay: 150,
+      retryCount: multi ? 0 : singleUrlRetries,
+      retryDelay: 250,
       fetchFn: tracedFetch(multi ? `${label}${i}` : label),
     });
   return multi ? fallback(urls.map(mk), { rank: false, retryCount: 1, retryDelay: 150 }) : mk(urls[0], 0);
 }
 
 export function makeClients(cfg: Pick<Config, "rpcUrl" | "logsRpcUrl" | "archiveRpcUrl">): Clients {
-  const mk = (value: string, label: string, multicall: boolean) => {
+  const mk = (value: string, label: string, multicall: boolean, singleUrlRetries = 1) => {
     const urls = splitUrls(value);
     if (urls.length === 0) throw new Error(`No RPC URL configured for ${label}`);
     return createPublicClient({
       chain: base,
-      transport: makeTransport(urls, label),
+      transport: makeTransport(urls, label, singleUrlRetries),
       // Concurrent eth_call reads (ERC-20 getters, factory lookups, balances) coalesce into one Multicall3
       // aggregate3 call: one provider-side request instead of dozens, which is what keeps us under the rate limits.
       // Calls with state overrides (the trade simulator) are never batched.
       ...(multicall ? { batch: { multicall: { batchSize: 8_192, wait: 5 } } } : {}),
     }) as PublicClient;
   };
-  return { rpc: mk(cfg.rpcUrl, "rpc", true), archive: mk(cfg.archiveRpcUrl, "archive", false), logs: mk(cfg.logsRpcUrl, "logs", false) };
+  return { rpc: mk(cfg.rpcUrl, "rpc", true), archive: mk(cfg.archiveRpcUrl, "archive", false), logs: mk(cfg.logsRpcUrl, "logs", false, 3) };
 }

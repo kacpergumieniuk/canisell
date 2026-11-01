@@ -11,10 +11,11 @@ PAY_TO = "0x741f78ED943C671e25405dAAaAB7b6886C7e8feb"
 PRICE_SINGLE = "$0.01"
 PRICE_BATCH = "$0.05"
 # Free public Base mainnet RPCs (token data always comes from Base mainnet). Comma-separated lists are tried in order.
-# publicnode and mainnet.base.org rate-limit Cloudflare's egress IPs, so they come last; LOGS needs a 10k-block eth_getLogs range.
-RPC_URL = "https://base-public.nodies.app,https://base-mainnet.public.blastapi.io,https://base-rpc.publicnode.com"
-ARCHIVE_RPC_URL = "https://base-public.nodies.app,https://base-mainnet.public.blastapi.io,https://base-rpc.publicnode.com,https://mainnet.base.org"
-LOGS_RPC_URL = "https://base-rpc.publicnode.com"
+# publicnode and mainnet.base.org rate-limit Cloudflare's egress IPs, so they come last; LOGS needs a 10k-block eth_getLogs range
+# (only publicnode and bloxroute allow that on a free tier).
+RPC_URL = "https://base-public.nodies.app,https://base-mainnet.public.blastapi.io,https://base.rpc.blxrbdn.com,https://base-rpc.publicnode.com"
+ARCHIVE_RPC_URL = "https://base-public.nodies.app,https://base-mainnet.public.blastapi.io,https://base.rpc.blxrbdn.com,https://base-rpc.publicnode.com,https://mainnet.base.org"
+LOGS_RPC_URL = "https://base-rpc.publicnode.com,https://base.rpc.blxrbdn.com"
 SIM_USD = "20"
 CACHE_TTL_SECONDS = "60"
 
@@ -25,8 +26,8 @@ FACILITATOR = "payai"
 PAY_TO = "0x741f78ED943C671e25405dAAaAB7b6886C7e8feb"
 PRICE_SINGLE = "$0.01"
 PRICE_BATCH = "$0.05"
-RPC_URL = "https://base-public.nodies.app,https://base-mainnet.public.blastapi.io,https://base-rpc.publicnode.com"
-ARCHIVE_RPC_URL = "https://base-public.nodies.app,https://base-mainnet.public.blastapi.io,https://base-rpc.publicnode.com,https://mainnet.base.org"
-LOGS_RPC_URL = "https://base-rpc.publicnode.com"
+RPC_URL = "https://base-public.nodies.app,https://base-mainnet.public.blastapi.io,https://base.rpc.blxrbdn.com,https://base-rpc.publicnode.com"
+ARCHIVE_RPC_URL = "https://base-public.nodies.app,https://base-mainnet.public.blastapi.io,https://base.rpc.blxrbdn.com,https://base-rpc.publicnode.com,https://mainnet.base.org"
+LOGS_RPC_URL = "https://base-rpc.publicnode.com,https://base.rpc.blxrbdn.com"
 SIM_USD = "20"
 CACHE_TTL_SECONDS = "60"

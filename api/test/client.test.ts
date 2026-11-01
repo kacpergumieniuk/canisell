@@ -2,6 +2,7 @@ import { decodeFunctionData, encodeAbiParameters, encodeFunctionResult, parseAbi
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeClients, splitUrls } from "../src/chain/client.ts";
 import { ERC20_ABI } from "../src/risk/contract.ts";
+import { redact } from "../src/risk/verdict.ts";
 
 const MULTICALL3 = "0xca11bde05977b3631167028862be2a173976ca11";
 const AGG3 = parseAbi(["function aggregate3((address target,bool allowFailure,bytes callData)[]) returns ((bool success,bytes returnData)[])"]);
@@ -47,6 +48,10 @@ afterEach(() => vi.unstubAllGlobals());
 describe("RPC clients", () => {
   it("splits a comma-separated URL list", () => {
     expect(splitUrls(" https://a , https://b,, ")).toEqual(["https://a", "https://b"]);
+  });
+
+  it("never lets an RPC URL (which may carry an API key) reach an API response", () => {
+    expect(redact("HTTP request failed.\n\nStatus: 429\nURL: https://rpc.example/v2/SECRETKEY\nRequest body: {}")).not.toContain("SECRETKEY");
   });
 
   it("coalesces concurrent contract reads into one Multicall3 request", async () => {

@@ -6,7 +6,7 @@ import { makeClients, type Clients } from "./chain/client.ts";
 import { requestTiming } from "./chain/trace.ts";
 import type { Config } from "./config.ts";
 import { registerDiscovery } from "./discovery.ts";
-import { checkToken, DISCLAIMER, ENGINE_VERSION, InputError, parseTokenAddress, type VerdictResponse } from "./risk/verdict.ts";
+import { checkToken, DISCLAIMER, ENGINE_VERSION, InputError, parseTokenAddress, redact, type VerdictResponse } from "./risk/verdict.ts";
 import { SAMPLE_VERDICT } from "./sample.ts";
 import { Timings } from "./timing.ts";
 import { BATCH_DESCRIPTION, lazyPaymentMiddleware, plausiblePayment, SERVICE_NAME, SINGLE_DESCRIPTION } from "./x402.ts";
@@ -195,7 +195,7 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
       timing.info.partial = v.meta?.partial?.length;
       return c.json(v, 200, { "Cache-Control": "no-store" });
     } catch (e) {
-      return c.json({ error: (e as Error).message?.slice(0, 300) }, errorStatus(e));
+      return c.json({ error: redact((e as Error).message ?? "").slice(0, 300) }, errorStatus(e));
     }
   });
 
@@ -212,7 +212,7 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
         try {
           results[idx] = await check(unique[idx], c.get("timing"));
         } catch (e) {
-          results[idx] = { address: unique[idx], error: (e as Error).message?.slice(0, 300), status: errorStatus(e) };
+          results[idx] = { address: unique[idx], error: redact((e as Error).message ?? "").slice(0, 300), status: errorStatus(e) };
         }
       }
     };

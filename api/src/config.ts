@@ -20,10 +20,12 @@ export const DEFAULT_PAY_TO = "0x741f78ED943C671e25405dAAaAB7b6886C7e8feb";
  * testing (state-override eth_call, Multicall3, archive eth_getCode). Providers change limits without notice:
  * for production traffic put a keyed endpoint first (`wrangler secret put RPC_URL`).
  */
-export const DEFAULT_RPC_URLS = "https://base-public.nodies.app,https://base-mainnet.public.blastapi.io,https://base-rpc.publicnode.com";
-export const DEFAULT_ARCHIVE_RPC_URLS = "https://base-public.nodies.app,https://base-mainnet.public.blastapi.io,https://base-rpc.publicnode.com,https://mainnet.base.org";
-/** eth_getLogs over 10k blocks: only publicnode allows that range on a free tier. */
-export const DEFAULT_LOGS_RPC_URL = "https://base-rpc.publicnode.com";
+export const DEFAULT_RPC_URLS =
+  "https://base-public.nodies.app,https://base-mainnet.public.blastapi.io,https://base.rpc.blxrbdn.com,https://base-rpc.publicnode.com";
+export const DEFAULT_ARCHIVE_RPC_URLS =
+  "https://base-public.nodies.app,https://base-mainnet.public.blastapi.io,https://base.rpc.blxrbdn.com,https://base-rpc.publicnode.com,https://mainnet.base.org";
+/** eth_getLogs over 10k blocks: of the free tiers only publicnode and bloxroute allow that range (nodies 50, blastapi 10, tenderly 1000). */
+export const DEFAULT_LOGS_RPC_URL = "https://base-rpc.publicnode.com,https://base.rpc.blxrbdn.com";
 
 export interface Config {
   /** Base mainnet RPC(s), comma-separated, for reads and eth_call simulations (needs state overrides). */

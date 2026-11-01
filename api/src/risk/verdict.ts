@@ -22,6 +22,9 @@ export class InputError extends Error {
 export class NotTokenError extends Error {
   status = 422;
 }
+/** Error text is shown to API clients: never let an RPC URL (which may embed an API key) through. */
+export const redact = (s: string) => s.replace(/https?:\/\/\S+/g, "<rpc>");
+
 /** Upstream RPC trouble that would make the verdict unreliable: surfaced as 502 (and not charged). */
 export class UpstreamError extends Error {
   status = 502;
@@ -179,7 +182,7 @@ export async function gatherFacts(clients: Clients, address: Address, opts: Chec
   const discovery: Discovery = (await discoveryP) ?? { pools: [], errors: [], complete: false };
   errors.push(...discovery.errors);
   if (discovery.pools.length === 0 && !discovery.complete)
-    throw new UpstreamError(`Pool discovery incomplete (RPC errors), refusing to report "no pool": ${errors.join("; ").slice(0, 200)}`);
+    throw new UpstreamError(`Pool discovery incomplete (RPC errors), refusing to report "no pool": ${redact(errors.join("; ")).slice(0, 200)}`);
 
   // creator: launchpad-specific first, else the creation tx sender (unless it was a 4337 bundle).
   // Starts as soon as the address is known and runs alongside pool analysis and the simulation.
@@ -317,7 +320,7 @@ export function toResponse(f: TokenFacts, v: Verdict, startedAt: number): Verdic
       checkedAt: new Date().toISOString(),
       latencyMs: Date.now() - startedAt,
       engine: ENGINE_VERSION,
-      partial: f.errors,
+      partial: f.errors.map(redact),
       disclaimer: DISCLAIMER,
     },
   };
