@@ -1,4 +1,4 @@
-# Base Token Verdict API
+# Canisell API
 
 Pay-per-call HTTP API that returns a **SAFE / CAUTION / DANGER** verdict for a Base (chain 8453) ERC-20 token, built for brand-new Clanker / Zora / Uniswap v4 launches. Each call is paid in USDC through [x402](https://x402.org); the server holds no keys (the facilitator verifies and settles).
 
@@ -96,11 +96,11 @@ Run by hand: `npm run mcp`. Client config (Claude Desktop `claude_desktop_config
 ```json
 {
   "mcpServers": {
-    "base-token-verdict": {
+    "canisell": {
       "command": "npx",
       "args": ["tsx", "/ABSOLUTE/PATH/TO/canisell/api/mcp/server.ts"],
       "env": {
-        "VERDICT_API_URL": "https://base-token-verdict.<your-subdomain>.workers.dev",
+        "VERDICT_API_URL": "https://api.canisell.xyz",
         "EVM_PRIVATE_KEY": "0x...your dedicated wallet key..."
       }
     }
@@ -112,7 +112,7 @@ If `npx` is not on the app's PATH, use the absolute path to `npx` or `node_modul
 
 ## Deploy to Cloudflare Workers
 
-Not deployed yet. After the owner has run `npx wrangler login`:
+Production runs at https://api.canisell.xyz (Base mainnet USDC, PayAI facilitator). To deploy your own copy, after `npx wrangler login`:
 
 ```bash
 cd api
@@ -129,8 +129,8 @@ npx wrangler deploy --env production
 Check `PAY_TO` in `wrangler.toml` is the wallet you want to be paid at before deploying to production. No secrets are required. Optionally set `PUBLIC_BASE_URL` in the vars to the deployed origin. Then verify:
 
 ```bash
-curl https://base-token-verdict.<subdomain>.workers.dev/v1/health
-curl -i https://base-token-verdict.<subdomain>.workers.dev/v1/verdict/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913   # expect 402
+curl https://api.canisell.xyz/v1/health
+curl -i https://api.canisell.xyz/v1/verdict/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913   # expect 402
 ```
 
 Note: wrangler names the production environment worker `base-token-verdict-production`, so its URL differs from the testnet one.
