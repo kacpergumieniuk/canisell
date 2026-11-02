@@ -1,4 +1,6 @@
-# Awesome-list PRs (drafts; no PR has been opened)
+# Awesome-list PRs
+
+Opened: xpaysh/awesome-x402#2100 (Canisell, 2026-11-02, no review yet). Recall-Kitchen/awesome-x402-mcp-services excludes token screens, so Canisell is not listed there (Readmd #137 and Prescan #138 were opened instead).
 
 Rules from `DECISIONS.md` D11 and `research/marketing.md`: one PR per list, each checked by hand for fit, opened from the owner's own account, no mass PRs, no follow-up pings. Each PR below should disclose that the text was drafted with an AI assistant and reviewed by the owner.
 Wait until the API is live, the repo is public and the npm package is published; every list wants a working link.
@@ -106,3 +108,36 @@ Disclosure: drafted with an AI assistant, reviewed and submitted by the owner.
 - **punkpeye/awesome-remote-mcp-servers:** remote-only; we have no hosted MCP endpoint yet. Revisit if one is added.
 - **sindresorhus/awesome:** excludes blockchain-related lists (per another maintainer's notes); not applicable.
 - **badkk/awesome-crypto-mcp-servers:** last push 2025-03, looks unmaintained.
+
+---
+
+## 3. punkpeye/awesome-remote-mcp-servers (ready; waiting for Glama connectors)
+
+- **Repo:** https://github.com/punkpeye/awesome-remote-mcp-servers (about 2.4k stars, merges daily).
+- **Blocker (2026-11-02):** CI requires a Glama connector page. Glama mirrors the official MCP registry, where `xyz.canisell/canisell`, `/prescan` and `/readmd` were published on 2026-11-02, but the pages still returned 404 that evening. Check `https://glama.ai/mcp/connectors/xyz.canisell/canisell` before opening.
+- **Rules:** star the repo first (required), one server per entry, alphabetical within the category, description is one sentence up to 120 characters, auth marker 🔓 (no auth). Title may end with `🤖🤖🤖` (agent fast-track) when opened by an agent.
+- **Entries** (one PR each):
+
+**Canisell (Finance)**
+
+```markdown
+- [Canisell](https://canisell.xyz) `https://api.canisell.xyz/mcp`
+  [![Canisell MCP connector](https://glama.ai/mcp/connectors/xyz.canisell/canisell/badges/score.svg)](https://glama.ai/mcp/connectors/xyz.canisell/canisell)
+  🔓 - Can I sell this Base token? Simulated buy and sell, taxes, owner powers, liquidity; $0.01 per check via x402.
+```
+
+**Prescan (Security)**
+
+```markdown
+- [Prescan](https://prescan.canisell.xyz) `https://prescan.canisell.xyz/mcp`
+  [![Prescan MCP connector](https://glama.ai/mcp/connectors/xyz.canisell/prescan/badges/score.svg)](https://glama.ai/mcp/connectors/xyz.canisell/prescan)
+  🔓 - Prompt-injection, MCP tool-poisoning and x402 pay-safety pre-checks for agents; free preview, x402 per call.
+```
+
+**Readmd (Search & Data Extraction)**
+
+```markdown
+- [Readmd](https://readmd.canisell.xyz) `https://readmd.canisell.xyz/mcp`
+  [![Readmd MCP connector](https://glama.ai/mcp/connectors/xyz.canisell/readmd/badges/score.svg)](https://glama.ai/mcp/connectors/xyz.canisell/readmd)
+  🔓 - Any web page as clean Markdown with metadata, outline and token counts; free preview, $0.001 per page via x402.
+```
