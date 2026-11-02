@@ -4,6 +4,7 @@ Pay-per-call risk verdicts (SAFE / CAUTION / DANGER) for newly launched ERC-20 t
 
 - Site: https://canisell.xyz
 - API: https://api.canisell.xyz ([OpenAPI](https://api.canisell.xyz/openapi.json), [free sample](https://api.canisell.xyz/v1/sample), [llms.txt](https://api.canisell.xyz/llms.txt))
+- MCP: `https://api.canisell.xyz/mcp` (remote, Streamable HTTP). Free tools `get_token_info`, `get_sample_verdict`, `explain_verdict_fields`; `check_base_token` is $0.01 via x402. Config: `{"mcpServers": {"canisell": {"url": "https://api.canisell.xyz/mcp"}}}`, or `npx -y mcp-remote https://api.canisell.xyz/mcp` for stdio-only clients.
 - $0.01 per token, $0.05 per batch of up to 10.
 
 ```bash

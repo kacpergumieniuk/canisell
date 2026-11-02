@@ -1,13 +1,19 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.kacpergumieniuk/canisell",
-  "description": "Pay-per-call (x402) SAFE/CAUTION/DANGER risk verdict for new ERC-20 tokens on Base.",
+  "description": "Base token risk verdicts (SAFE/CAUTION/DANGER). Free metadata tools; paid check via x402.",
   "repository": {
     "url": "https://github.com/kacpergumieniuk/canisell",
     "source": "github"
   },
   "version": "0.1.0",
   "websiteUrl": "https://canisell.xyz",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.canisell.xyz/mcp"
+    }
+  ],
   "packages": [
     {
       "registryType": "npm",

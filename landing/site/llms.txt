@@ -1,0 +1,27 @@
+# Canisell
+
+> Canisell answers "can I sell this token?" before you buy. Pay-per-call risk verdicts (SAFE / CAUTION / DANGER, a 0-100 score and reasons) for ERC-20 tokens on Base (chain 8453), built for brand-new Clanker / Zora / Uniswap v4 launches. For trading bots and AI agents. Paid in USDC over x402: no accounts, no API keys. Automated risk signals, not financial advice.
+
+A check simulates a buy and a sell via eth_call (honeypot, buy/sell tax, round-trip loss), reads owner powers (mint, blacklist, pause, fee setters, trading toggle, upgradeable proxy), exit liquidity and LP lock on Uniswap v2/v3/v4 and Aerodrome, token age and the creator's history. Results are cached 60 seconds per address. Failed checks (bad address 400, not a token 422, upstream error 502) are not charged.
+
+## HTTP API (https://api.canisell.xyz)
+- GET https://api.canisell.xyz/v1/verdict/{address}: $0.01 USDC per call. Call without payment to get HTTP 402 with the x402 payment requirements (PAYMENT-REQUIRED header); an x402 client such as @x402/fetch pays and retries.
+- POST https://api.canisell.xyz/v1/verdict/batch: $0.05 USDC for up to 10 addresses. JSON body {"addresses": ["0x...", ...]}.
+- GET https://api.canisell.xyz/v1/sample: free example response
+- GET https://api.canisell.xyz/v1/health: free status
+- GET https://api.canisell.xyz/openapi.json: OpenAPI 3.1 with prices (x-payment-info)
+- GET https://api.canisell.xyz/.well-known/x402: x402 resource list
+- GET https://api.canisell.xyz/llms.txt: API details for LLMs
+
+Payment: x402 v2, scheme "exact", USDC on Base mainnet (eip155:8453), settled through a facilitator; the server holds no keys.
+
+## MCP server (remote)
+- URL: https://api.canisell.xyz/mcp (Streamable HTTP, stateless; no install, no API key)
+- Client config: {"mcpServers": {"canisell": {"url": "https://api.canisell.xyz/mcp"}}}
+- Stdio-only clients: npx -y mcp-remote https://api.canisell.xyz/mcp
+- Free tools: get_token_info(address) (contract + ERC-20 name, symbol, decimals, supply), get_sample_verdict(), explain_verdict_fields()
+- Paid tool: check_base_token(address), $0.01 USDC via the x402 MCP transport (_meta["x402/payment"]). Clients without an x402 wallet get the payment terms and the paid HTTP URL instead of a verdict; nothing is charged.
+
+## Links
+- Site: https://canisell.xyz
+- Source: https://github.com/kacpergumieniuk/canisell

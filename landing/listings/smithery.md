@@ -1,3 +1,5 @@
+> **OBSOLETE (2026-11-02). Do not use.** Smithery closed new publishing on 2026-10-31: accounts, CLI, API and hosting are gone and it is now a curated directory (`research/agent-apis-2026-11/mcp.md` §2.1). Kept only as a record; the remote endpoint `https://api.canisell.xyz/mcp` is listed through the official MCP registry, Glama and mcp.so instead.
+
 # Smithery
 
 Docs checked 2026-11-01 (smithery.ai/docs/build/publish). Two publishing paths exist:

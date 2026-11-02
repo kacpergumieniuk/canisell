@@ -6,7 +6,8 @@ import { TtlCache, workersEdgeCache } from "./cache.ts";
 import { makeClients, type Clients } from "./chain/client.ts";
 import { requestTiming } from "./chain/trace.ts";
 import type { Config } from "./config.ts";
-import { registerDiscovery } from "./discovery.ts";
+import { baseUrl, registerDiscovery } from "./discovery.ts";
+import { handleMcp, lazyPaidWrapper, readTokenInfo, type TokenInfo } from "./mcp.ts";
 import { checkToken, DISCLAIMER, ENGINE_VERSION, InputError, parseTokenAddress, redact, type VerdictResponse } from "./risk/verdict.ts";
 import { SAMPLE_VERDICT } from "./sample.ts";
 import { Timings } from "./timing.ts";
@@ -28,6 +29,8 @@ export interface AppDeps {
   clients?: Clients;
   /** Override for tests: stand-in for caches.default. */
   edgeStore?: Pick<Cache, "match" | "put">;
+  /** Override for tests: the free MCP token-metadata lookup. */
+  tokenInfo?: (address: Address, timing?: Timings) => Promise<TokenInfo>;
 }
 
 function errorStatus(e: unknown): 400 | 422 | 502 {
@@ -125,6 +128,13 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
         { method: "GET", path: "/openapi.json", price: "free", description: "OpenAPI 3.1 with prices (x-payment-info)" },
         { method: "GET", path: "/.well-known/x402", price: "free", description: "x402 resource list for directories" },
         { method: "GET", path: "/llms.txt", price: "free", description: "Plain-text description for LLMs" },
+        {
+          method: "POST",
+          path: "/mcp",
+          price: `free tools; check_base_token ${cfg.priceSingle} via x402`,
+          description:
+            "Remote MCP server (Streamable HTTP, stateless). Tools: check_base_token (paid, x402 MCP transport), get_token_info, get_sample_verdict, explain_verdict_fields (free). Client config: {\"url\": \"<origin>/mcp\"}",
+        },
       ],
       disclaimer: DISCLAIMER,
     }),
@@ -159,6 +169,49 @@ export function createApp(cfg: Config, deps: AppDeps = {}) {
   app.get("/v1/sample", (c) => c.json(SAMPLE_VERDICT));
 
   registerDiscovery(app, cfg);
+
+  // Remote MCP (Streamable HTTP, stateless). The paid tool runs the engine only after a verified x402 payment.
+  const tokenInfoCache = new TtlCache<TokenInfo>(600_000, 2_000);
+  const tokenInfoEdge = workersEdgeCache<TokenInfo>(600, "tokeninfo-v1", deps.edgeStore);
+  const tokenInfo =
+    deps.tokenInfo ??
+    (async (address: Address, timing?: Timings): Promise<TokenInfo> => {
+      const hit = tokenInfoCache.get(address) ?? (await tokenInfoEdge.get(address));
+      if (hit) {
+        tokenInfoCache.set(address, hit);
+        return hit;
+      }
+      const info = await readTokenInfo(clients.rpc, address);
+      tokenInfoCache.set(address, info);
+      timing?.background.push(tokenInfoEdge.put(address, info));
+      return info;
+    });
+  let mcpOrigin = cfg.publicBaseUrl ?? "http://localhost:8787";
+  const paidWrapper = lazyPaidWrapper(cfg, () => mcpOrigin);
+  app.post("/mcp", (c) => {
+    mcpOrigin = baseUrl(cfg, c.req.url);
+    return handleMcp(c.req.raw, { cfg, origin: mcpOrigin, check: (a) => check(a, c.get("timing")), tokenInfo: (a) => tokenInfo(a, c.get("timing")), paidWrapper });
+  });
+  app.get("/mcp", (c) => {
+    // Stateless server: no standalone SSE stream for server-initiated messages.
+    if ((c.req.header("accept") ?? "").includes("text/event-stream")) return c.json({ error: "Method Not Allowed: use POST" }, 405, { Allow: "POST" });
+    const origin = baseUrl(cfg, c.req.url);
+    return c.json({
+      name: "canisell",
+      description: "Remote MCP server (Streamable HTTP, stateless). POST JSON-RPC here; add it to an MCP client by URL.",
+      url: `${origin}/mcp`,
+      clientConfig: { mcpServers: { canisell: { url: `${origin}/mcp` } } },
+      stdioClients: { mcpServers: { canisell: { command: "npx", args: ["-y", "mcp-remote", `${origin}/mcp`] } } },
+      tools: {
+        check_base_token: `paid, ${cfg.priceSingle} USDC via x402 (MCP transport, _meta["x402/payment"]); without payment returns the terms and the paid HTTP URL`,
+        get_token_info: "free: contract + ERC-20 metadata",
+        get_sample_verdict: "free: example verdict",
+        explain_verdict_fields: "free: field guide, limits, prices",
+      },
+      docs: `${origin}/llms.txt`,
+    });
+  });
+  app.delete("/mcp", (c) => c.json({ error: "Method Not Allowed: stateless server, no sessions" }, 405, { Allow: "POST" }));
 
   // Unpaid requests always reach the paywall, so discovery probes (x402scan probes the literal "{address}") see the 402.
   // A request that carries a payment is validated first: a malformed one gets a 400 and is never settled.

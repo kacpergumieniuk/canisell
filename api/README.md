@@ -18,6 +18,7 @@ Runs on Cloudflare Workers (Hono) and locally on Node.
 | GET | `/openapi.json` | free | OpenAPI 3.1, prices in `x-payment-info` (x402scan format) |
 | GET | `/.well-known/x402` | free | x402scan resource list (`version: 1`) |
 | GET | `/llms.txt` | free | Short plain-text description for LLM tools |
+| POST | `/mcp` | free tools; `check_base_token` $0.01 | Remote MCP server (Streamable HTTP, stateless), see below |
 
 Malformed requests get a 400 before the paywall; non-token addresses get 422 and failed checks are not settled (no charge). Prices are configurable (`PRICE_SINGLE`, `PRICE_BATCH`). Content is served only after the facilitator has verified and settled the payment: @x402/hono buffers the handler response, settles, and turns a failed settlement into a 402 with no body (`requireSettlement` in `src/x402.ts` enforces this as a second line of defence). Responses carry Bazaar discovery metadata so x402 Bazaar can index the service.
 
@@ -74,14 +75,48 @@ An x402 client (for example `@x402/fetch` with a funded Base Sepolia wallet) pay
 ## Tests
 
 ```bash
-npm test             # vitest: scoring, bytecode, simulation, mocked-RPC engine, x402 402 response, MCP server
+npm test             # vitest: scoring, bytecode, simulation, mocked-RPC engine, x402 402 response, MCP servers (stdio + remote /mcp)
 npm run typecheck    # tsc --noEmit
 LIVE=1 npm run test:live   # smoke test: real USDC check against public Base RPCs (network required, no payment)
 ```
 
 `npm test` skips the live test unless `LIVE=1` is set.
 
-## MCP server (stdio)
+## Remote MCP server (hosted)
+
+`https://api.canisell.xyz/mcp` is a remote MCP server on the same Worker (Streamable HTTP, stateless, JSON responses; no install, no API key, no Durable Objects). Code: `src/mcp.ts`.
+
+| Tool | Price | What it does |
+| --- | --- | --- |
+| `check_base_token(address)` | $0.01 USDC (x402) | The full verdict. Uses the x402 MCP transport (`@x402/mcp`): without `_meta["x402/payment"]` it returns `isError` with the x402 `PaymentRequired` object plus plain-text instructions (the paid HTTP URL and an `@x402/fetch` snippet). No engine run, no charge. With a payment it verifies, runs the check and settles only if the check succeeded. |
+| `get_token_info(address)` | free | Is it a contract / an ERC-20, plus name, symbol, decimals, total supply. One `eth_getCode` and one Multicall3 read, cached 10 minutes per address. |
+| `get_sample_verdict()` | free | Cached example verdict |
+| `explain_verdict_fields()` | free | What the verdict, score and fields mean, limits, prices, JSON schema |
+
+Mainstream clients (Claude, Cursor, ChatGPT) cannot pay x402 themselves, so in those clients `check_base_token` returns the payment terms. Clients with an x402 wallet (for example `@x402/mcp` `createx402MCPClient`, or a wallet MCP proxy) pay inside MCP. The stdio server below pays from your own wallet.
+
+Client config for clients that support remote servers (Cursor `~/.cursor/mcp.json`, Claude Code, VS Code, Windsurf):
+
+```json
+{ "mcpServers": { "canisell": { "url": "https://api.canisell.xyz/mcp" } } }
+```
+
+Claude Code: `claude mcp add --transport http canisell https://api.canisell.xyz/mcp`. For stdio-only clients (Claude Desktop config file), bridge with `mcp-remote`:
+
+```json
+{ "mcpServers": { "canisell": { "command": "npx", "args": ["-y", "mcp-remote", "https://api.canisell.xyz/mcp"] } } }
+```
+
+`GET /mcp` returns a short JSON description of the endpoint; a GET asking for an SSE stream and `DELETE` get 405 (stateless server).
+
+Quick check with curl:
+
+```bash
+curl -s https://api.canisell.xyz/mcp -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+## MCP server (stdio, pays from your wallet)
 
 `mcp/server.ts` exposes one tool, `check_base_token(address)`, which calls this API and returns the verdict JSON. Claude Desktop and Cursor cannot pay x402 invoices themselves, so the MCP server acts as the x402 client: it pays from a wallet you provide. Without a wallet it returns the 402 payment terms instead of a verdict.
 

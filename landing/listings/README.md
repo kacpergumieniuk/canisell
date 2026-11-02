@@ -1,6 +1,6 @@
 # Listings kit
 
-**Status 2026-11-01:** API live at https://api.canisell.xyz, landing at https://canisell.xyz. **x402scan: registered** (8/8 resources, merchant page tryponcho.com/m/api.canisell.xyz). Everything else below is not submitted yet.
+**Status 2026-11-02:** API live at https://api.canisell.xyz, landing at https://canisell.xyz (with `/llms.txt`). **Hosted remote MCP live at https://api.canisell.xyz/mcp** (Streamable HTTP, stateless; free tools `get_token_info`, `get_sample_verdict`, `explain_verdict_fields`; paid `check_base_token` via the x402 MCP transport). Repo is public. **x402scan: registered** (8/8 resources, merchant page tryponcho.com/m/api.canisell.xyz). **Smithery: closed to new publishing since 2026-10-31, `smithery.md` is obsolete.** Everything else below is not submitted yet.
 
 Everything is ready-to-paste text. Nothing was published, submitted, or deployed, and no PR was opened.
 The marketing rules from `DECISIONS.md` D11 apply to every text here: the account is labelled as a bot/automated, no spam (one submission per directory, one PR per list), we say "risk signals", and no text calls a specific token a scam.
@@ -20,8 +20,8 @@ The name "Canisell" is a recommendation (see `../NAMES.md`), not a decision. The
 
 ## Prerequisites that are not done yet
 
-1. The API is not deployed (`api/README.md`: "Not deployed yet"). Directories scan a live URL, so deploy to mainnet first (`npx wrangler deploy --env production`, owner action).
-2. The MCP server is not published. Today it runs from a local path with `tsx`. It needs a public GitHub repo and an npm package (`canisell-mcp`, with a `bin` and `"mcpName": "io.github.kacpergumieniuk/canisell"` in `package.json`), published by the owner with 2FA or trusted publishing. The landing page MCP snippet assumes this package exists.
+1. Done: the API and the remote MCP endpoint are deployed (`https://api.canisell.xyz`, `/mcp`).
+2. The stdio MCP server is not published on npm. Today it runs from a local path with `tsx`. It needs a public GitHub repo and an npm package (`canisell-mcp`, with a `bin` and `"mcpName": "io.github.kacpergumieniuk/canisell"` in `package.json`), published by the owner with 2FA or trusted publishing. The landing page MCP snippet assumes this package exists.
 3. Discovery files are implemented: `/.well-known/x402`, `/openapi.json`, `/llms.txt` (free, see `api/src/discovery.ts`).
 4. One paid test call from our own wallet is needed for Bazaar indexing (D11). It is not counted as revenue and is not repeated.
 
@@ -31,7 +31,7 @@ The name "Canisell" is a recommendation (see `../NAMES.md`), not a decision. The
 |---|---|---|---|
 | 1 | Official MCP registry | `server.json` + steps below | GitHub login (`mcp-publisher login github`), npm publish |
 | 2 | x402scan | `x402scan.md` | the form submission |
-| 3 | Smithery | `smithery.md` | Smithery login (GitHub OAuth) |
+| ~~3~~ | ~~Smithery~~ | `smithery.md` (obsolete) | closed to new listings since 2026-10-31 |
 | 4 | Glama | `glama.md` (+ `glama.json` for the repo root) | claim click |
 | 5 | mcp.so | `mcp-so.md` | the submission |
 | 6 | Awesome lists | `awesome-prs.md` | review, then open each PR from the owner's own account |
@@ -46,7 +46,7 @@ Rules that came out of the docs:
 - Add `"mcpName": "io.github.kacpergumieniuk/canisell"` to the package's `package.json` **before** `npm publish`. Without it you get "Registry validation failed for package".
 - `version` in `server.json` and in the `packages` entry should match the published npm version.
 - Publishing: `mcp-publisher init` (or copy this file), `mcp-publisher login github`, `mcp-publisher publish`. The CLI install method changes between releases, so use the current README at github.com/modelcontextprotocol/registry rather than a pinned command. (Not run here.)
-- The server is stdio with an npm package, so `remotes` is not used. If a remote (streamable-http) MCP endpoint is added later, add a `remotes` entry.
+- `server.json` now has a `remotes` entry (`streamable-http`, `https://api.canisell.xyz/mcp`) next to the npm `packages` entry. If the npm package is not published first, drop the `packages` block and publish remote-only (the registry accepts remote-only servers). Re-validated with Ajv against the 2025-12-11 schema on 2026-11-02 (valid; description 89 characters).
 
 ## What was verified and what was not
 

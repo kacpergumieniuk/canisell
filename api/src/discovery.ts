@@ -51,6 +51,12 @@ function endpoints(cfg: Config): EndpointDoc[] {
     { id: "getOpenApi", method: "get", path: "/openapi.json", summary: "OpenAPI 3.1 description", description: "This document. Free." },
     { id: "getWellKnownX402", method: "get", path: "/.well-known/x402", summary: "x402 resource list", description: "x402scan discovery fan-out. Free." },
     { id: "getLlmsTxt", method: "get", path: "/llms.txt", summary: "Plain-text description for LLMs", description: "Short plain-text description and usage. Free." },
+    {
+      id: "postMcp", method: "post",
+      path: "/mcp",
+      summary: "Remote MCP server (Streamable HTTP)",
+      description: `Model Context Protocol endpoint, Streamable HTTP, stateless, JSON-RPC 2.0 over POST. Free tools: get_token_info, get_sample_verdict, explain_verdict_fields. check_base_token costs ${cfg.priceSingle} USDC via the x402 MCP transport (_meta["x402/payment"]); without a payment it returns the payment terms and the paid HTTP URL.`,
+    },
   ];
 }
 
@@ -59,7 +65,7 @@ export function usdAmount(price: string): string {
   return price.trim().replace(/^\$/, "");
 }
 
-function baseUrl(cfg: Config, requestUrl: string): string {
+export function baseUrl(cfg: Config, requestUrl: string): string {
   return (cfg.publicBaseUrl ?? new URL(requestUrl).origin).replace(/\/+$/, "");
 }
 
@@ -83,6 +89,7 @@ export function openApiDocument(cfg: Config, origin: string) {
     else if (e.path === "/v1/verdict/batch") responses["200"] = { description: "Verdicts", content: json(BATCH_OUTPUT_SCHEMA) };
     else if (e.path === "/openapi.json" || e.path === "/.well-known/x402") responses["200"] = { description: "OK", content: json({ type: "object" }) };
     else if (e.path === "/llms.txt") responses["200"] = { description: "OK", content: { "text/plain": { schema: { type: "string" } } } };
+    else if (e.path === "/mcp") responses["200"] = { description: "JSON-RPC response", content: json({ type: "object" }) };
     else responses["200"] = { description: "OK", content: json({ type: "object" }) };
     if (paid) {
       responses["400"] = { description: "Malformed request; payment is not settled" };
@@ -97,6 +104,9 @@ export function openApiDocument(cfg: Config, origin: string) {
       ...(e.path.includes("{address}") ? { parameters: [{ name: "address", in: "path", required: true, schema: ADDRESS_SCHEMA }] } : {}),
       ...(e.path === "/v1/verdict/batch"
         ? { requestBody: { required: true, content: { "application/json": { schema: BATCH_INPUT_SCHEMA } } } }
+        : {}),
+      ...(e.path === "/mcp"
+        ? { requestBody: { required: true, content: { "application/json": { schema: { type: "object", description: "MCP JSON-RPC 2.0 request (initialize, tools/list, tools/call)" } } } } }
         : {}),
       responses,
     };
@@ -153,6 +163,11 @@ Payment: x402, USDC on ${cfg.network}, scheme "exact". Call a paid endpoint with
 - GET ${origin}/v1/health: service and RPC status
 - GET ${origin}/openapi.json: OpenAPI 3.1 with prices (x-payment-info)
 - GET ${origin}/.well-known/x402: x402 resource list
+
+## MCP server (remote)
+- URL: ${origin}/mcp (Streamable HTTP, stateless; no install, no API key). Client config: {"mcpServers": {"canisell": {"url": "${origin}/mcp"}}}. For stdio-only clients: npx -y mcp-remote ${origin}/mcp
+- Free tools: get_token_info(address) (contract + ERC-20 name/symbol/decimals/supply), get_sample_verdict(), explain_verdict_fields()
+- Paid tool: check_base_token(address), ${cfg.priceSingle} USDC via the x402 MCP transport (_meta["x402/payment"], e.g. @x402/mcp). Without a payment it returns the x402 payment terms and the paid HTTP URL; no verdict, no charge.
 
 ## Notes
 - Token data always comes from Base mainnet; payments settle on ${cfg.network}.

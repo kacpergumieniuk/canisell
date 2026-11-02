@@ -17,8 +17,9 @@ Format taken from `glama.json` files in other public MCP repos (for example `cli
 - **Repository:** https://github.com/kacpergumieniuk/canisell
 - **Name:** Canisell
 - **Short description (fits most fields):**
-  Pre-trade risk signals for new ERC-20 tokens on Base. The `check_base_token` tool returns a SAFE / CAUTION / DANGER verdict with reasons, from a simulated buy and sell, taxes, owner powers (mint, pause, blacklist, upgradeable proxy), liquidity and token age. Pays per call in USDC over x402 ($0.01 per check); runs with a dedicated low-balance wallet, no accounts or API keys.
-- **Tools:** `check_base_token(address)`.
+  Pre-trade risk signals for new ERC-20 tokens on Base. Hosted remote MCP server at `https://api.canisell.xyz/mcp` (Streamable HTTP, no install, no API key). Free tools: `get_token_info` (contract + ERC-20 metadata), `get_sample_verdict`, `explain_verdict_fields`. The paid `check_base_token` tool returns a SAFE / CAUTION / DANGER verdict with reasons, from a simulated buy and sell, taxes, owner powers (mint, pause, blacklist, upgradeable proxy), liquidity and token age; $0.01 in USDC per check over x402 (x402 MCP transport, or the stdio server paying from a dedicated low-balance wallet).
+- **Remote URL (Glama "Connectors"):** https://api.canisell.xyz/mcp
+- **Tools:** `check_base_token(address)` (paid), `get_token_info(address)`, `get_sample_verdict()`, `explain_verdict_fields()` (free).
 - **Categories/tags:** crypto, finance, security, base, x402, token-risk.
 
 ## 3. Claim
@@ -27,4 +28,4 @@ After the listing exists, log in with GitHub and click "Claim". (Unverified: the
 
 ## Note
 
-Glama scores servers by building and introspecting them. The stdio server starts fine without a wallet (it returns payment terms), so introspection should work; if their sandbox needs a Dockerfile, add a minimal one that runs `npx -y canisell-mcp`.
+Glama scores servers by building and introspecting them. The remote endpoint can be introspected directly (`tools/list` needs no auth). The stdio server starts fine without a wallet (it returns payment terms), so introspection should work; if their sandbox needs a Dockerfile, add a minimal one that runs `npx -y canisell-mcp`.
