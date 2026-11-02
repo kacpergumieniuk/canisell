@@ -4,197 +4,352 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Canisell: can your bot sell it? Pay-per-call risk verdicts for new Base tokens</title>
-<meta name="description" content="Pay-per-call API (x402, USDC) that returns a SAFE / CAUTION / DANGER verdict with reasons for new ERC-20 tokens on Base: sellability, taxes, owner powers, liquidity, token age. No accounts, no API keys. Also an MCP tool.">
+<meta name="description" content="Pay-per-call API (x402, USDC) that returns a SAFE / CAUTION / DANGER verdict with reasons for new ERC-20 tokens on Base: simulated sell, taxes, owner powers, liquidity, token age. No accounts, no API keys.">
+<link rel="canonical" href="https://canisell.xyz/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Canisell">
+<meta property="og:url" content="https://canisell.xyz/">
 <meta property="og:title" content="Canisell: can your bot sell it?">
 <meta property="og:description" content="A SAFE / CAUTION / DANGER verdict with reasons for new Base tokens. $0.01 per check in USDC over x402. No accounts, no API keys.">
-<meta property="og:type" content="website">
-<meta name="theme-color" content="#efeadf">
+<meta property="og:image" content="https://canisell.xyz/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Canisell: can your bot sell it? A risk verdict for new Base tokens, $0.01 per check over x402.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Canisell: can your bot sell it?">
+<meta name="twitter:description" content="A SAFE / CAUTION / DANGER verdict with reasons for new Base tokens. $0.01 per check in USDC over x402.">
+<meta name="twitter:image" content="https://canisell.xyz/og.png">
+<meta name="theme-color" content="#0d1611">
+<meta name="color-scheme" content="light dark">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preload" href="/fonts/archivo-var.woff2" as="font" type="font/woff2" crossorigin>
 <!--
-  Canisell landing page. Single static file, no build step, no external requests.
-  Deploy: Cloudflare Pages, "Direct upload" of this folder (or a git-connected project with no build command and output dir "/").
-
-  BEFORE DEPLOYING: set the three values in CONFIG (bottom of the page). Every URL, curl line and config snippet
-  on the page is generated from them. "canisell", the domains and the npm package are PLACEHOLDERS until the owner
-  has bought/published them (see NAMES.md).
+  Canisell landing page. Single static file, no build step, no third-party requests (font is self-hosted).
+  Deploy: `npx wrangler deploy` from canisell/landing (Workers static assets, see wrangler.toml).
+  Brand sources (mark, wordmark, lockup, og image) live in landing/brand/.
+  CONFIG at the bottom fills the API URL into snippets and links.
 -->
 <style>
-:root {
-  --paper: #efeadf;
-  --paper-2: #e7e1d3;
-  --ink: #14130f;
-  --ink-2: #3b382f;
-  --mute: #6d675a;
-  --rule: #cdc5b1;
-  --safe: #1b6e45;
-  --caution: #a8650a;
-  --danger: #a82a21;
-  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+/* Hallmark · macrostructure: Workbench (hero + live response, ledger sections) · tone: technical, signage · anchor hue: exit-sign green 155
+ * theme: custom · paper oklch(97.6% 0.006 105) · accent oklch(51% 0.13 155) · Archivo (wdth 100-125) + system mono
+ * nav: N1b · footer: Ft5 statement · enrichment: none (real API response is the hero image)
+ * Hallmark · pre-emit critique: P4 H5 E4 S5 R4 V4
+ */
+@font-face {
+  font-family: "Archivo";
+  src: url("/fonts/archivo-var.woff2") format("woff2");
+  font-weight: 400 800;
+  font-stretch: 100% 125%;
+  font-style: normal;
+  font-display: swap;
 }
+:root {
+  --font-display: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  --color-paper: oklch(97.6% 0.006 105);
+  --color-paper-2: oklch(94.6% 0.01 115);
+  --color-ink: oklch(21% 0.02 160);
+  --color-ink-2: oklch(37% 0.015 160);
+  --color-mute: oklch(50% 0.012 160);
+  --color-rule: oklch(87.5% 0.01 130);
+  --color-brand: oklch(51% 0.13 155);
+  --color-brand-press: oklch(44% 0.12 155);
+  --color-brand-hi: oklch(80% 0.16 155);
+  --color-on-brand: oklch(97.6% 0.006 105);
+  --color-brand-wash: oklch(93% 0.04 155);
+  --color-brand-text: var(--color-brand);
+  --color-dot: var(--color-brand);
+  --color-safe: oklch(51% 0.13 155);
+  --color-caution: oklch(62% 0.14 65);
+  --color-danger: oklch(55% 0.19 27);
+  --color-focus: oklch(55% 0.16 155);
+
+  --color-night: oklch(19% 0.018 160);
+  --color-night-2: oklch(24% 0.02 160);
+  --color-night-rule: oklch(33% 0.02 160);
+  --color-night-fg: oklch(94% 0.008 110);
+  --color-night-mute: oklch(70% 0.015 150);
+  --color-night-fg-2: oklch(86% 0.01 120);
+  --color-brand-glow: oklch(80% 0.16 155 / .18);
+  --color-syn-key: oklch(85% 0.09 85);
+  --color-syn-str: oklch(85% 0.1 150);
+  --color-syn-num: oklch(82% 0.08 235);
+  --color-night-safe: oklch(80% 0.16 155);
+  --color-night-caution: oklch(80% 0.14 75);
+  --color-night-danger: oklch(70% 0.17 27);
+
+  --space-2xs: 4px; --space-xs: 8px; --space-sm: 12px; --space-md: 16px; --space-lg: 24px;
+  --space-xl: 32px; --space-2xl: 48px; --space-3xl: 64px; --space-4xl: 96px;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px;
+  --text-xs: 12px; --text-sm: 14px; --text-md: 17px; --text-lg: 20px;
+  --text-h2: clamp(30px, 4.2vw, 50px);
+  --text-display: clamp(48px, 6.9vw, 104px);
+  --ease-out: cubic-bezier(.2, .7, .2, 1);
+  --dur-fast: 140ms;
+  --wrap: 1200px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: oklch(16.5% 0.014 160);
+    --color-paper-2: oklch(21% 0.017 160);
+    --color-ink: oklch(95% 0.008 110);
+    --color-ink-2: oklch(82% 0.01 130);
+    --color-mute: oklch(68% 0.012 150);
+    --color-rule: oklch(30% 0.018 160);
+    --color-brand-wash: oklch(26% 0.05 155);
+    --color-brand-text: var(--color-brand-hi);
+    --color-dot: var(--color-brand-hi);
+    --color-safe: oklch(78% 0.16 155);
+    --color-caution: oklch(78% 0.14 72);
+    --color-danger: oklch(70% 0.17 27);
+    --color-focus: oklch(80% 0.16 155);
+    --color-night: oklch(12.5% 0.012 160);
+    --color-night-2: oklch(19% 0.016 160);
+    --color-night-rule: oklch(28% 0.018 160);
+  }
+}
+
 * { box-sizing: border-box; }
+html, body { overflow-x: clip; }
 html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 body {
-  margin: 0; background: var(--paper); color: var(--ink);
-  font: 17px/1.55 var(--sans);
-  background-image: radial-gradient(rgba(20,19,15,.055) 1px, transparent 1px);
-  background-size: 22px 22px;
+  margin: 0; background: var(--color-paper); color: var(--color-ink);
+  font: 400 var(--text-md)/1.55 var(--font-body);
+  font-stretch: 100%;
+  -webkit-font-smoothing: antialiased;
 }
 a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 a:hover { text-decoration-thickness: 2px; }
-code, pre, .mono { font-family: var(--mono); }
-.wrap { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
-:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+code, pre, .mono { font-family: var(--font-mono); }
+p code, li code, td code { font-size: .86em; background: var(--color-paper-2); padding: 1px 6px; border-radius: var(--radius-sm); }
+.wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 var(--space-xl); }
+:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+h1, h2, h3 { font-family: var(--font-display); font-style: normal; overflow-wrap: anywhere; min-width: 0; }
+.sym { position: absolute; width: 0; height: 0; overflow: hidden; }
 
-/* header */
-header.top { border-bottom: 1px solid var(--ink); }
-header.top .wrap { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; padding-top: 18px; padding-bottom: 14px; flex-wrap: wrap; }
-.brand { font-family: var(--serif); font-size: 26px; font-weight: 700; letter-spacing: -.01em; text-decoration: none; }
-.brand small { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--mute); margin-left: 12px; vertical-align: 3px; }
-nav a { font: 500 13px var(--mono); text-decoration: none; margin-left: 20px; color: var(--ink-2); }
-nav a:hover { color: var(--ink); text-decoration: underline; }
+/* ---------- brand lockup ---------- */
+.lockup { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--color-ink); }
+.lockup .mk { width: 30px; height: 30px; flex: none; }
+.lockup .wm { height: 21px; width: auto; }
+.mk { --mk-tile: var(--color-brand); --mk-glyph: var(--color-on-brand); }
+.wm { fill: currentColor; }
 
-/* hero */
-.hero { padding: 64px 0 72px; }
-.hero .wrap { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr); gap: 56px; align-items: start; }
-.eyebrow { font: 600 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--mute); margin: 0 0 22px; }
-h1 { font-family: var(--serif); font-weight: 700; font-size: clamp(40px, 6.2vw, 74px); line-height: .98; letter-spacing: -.025em; margin: 0 0 26px; }
-h1 em { font-style: italic; font-weight: 500; text-decoration: underline; text-decoration-color: rgba(168,42,33,.5); text-decoration-thickness: .07em; text-underline-offset: .12em; }
-.lede { font-size: 20px; line-height: 1.5; max-width: 34em; color: var(--ink-2); margin: 0 0 30px; }
-.cta { display: flex; gap: 12px; flex-wrap: wrap; }
-.btn { display: inline-block; font: 600 14px var(--mono); padding: 13px 20px; border: 1.5px solid var(--ink); text-decoration: none; background: transparent; color: var(--ink); cursor: pointer; }
-.btn.solid { background: var(--ink); color: var(--paper); }
-.btn:hover { background: var(--ink); color: var(--paper); text-decoration: none; }
-.btn.solid:hover { background: #000; }
-.facts { margin: 34px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px 22px; font: 500 13px var(--mono); color: var(--mute); }
-.facts li::before { content: "+"; margin-right: 7px; color: var(--ink); }
+/* ---------- top bar ---------- */
+.top { background: var(--color-night); color: var(--color-night-fg); }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: var(--space-lg); padding-top: 18px; padding-bottom: 18px; }
+.top .lockup { color: var(--color-night-fg); --color-dot: var(--color-brand-hi); }
+.top nav { display: flex; align-items: center; gap: 26px; }
+.top nav a { font-size: var(--text-sm); font-weight: 500; text-decoration: none; color: var(--color-night-mute); white-space: nowrap; }
+.top nav a:hover { color: var(--color-night-fg); }
+.top nav a.pill { color: var(--color-night-fg); border: 1px solid var(--color-night-rule); padding: 8px 14px; border-radius: 999px; }
+.top nav a.pill:hover { border-color: var(--color-night-mute); }
 
-/* receipt */
-.receipt {
-  background: #fbf9f3; color: var(--ink); font: 13px/1.5 var(--mono);
-  padding: 26px 26px 30px; position: relative; transform: rotate(1.1deg);
-  box-shadow: 0 1px 0 rgba(20,19,15,.5), 8px 10px 0 -1px rgba(20,19,15,.09), 0 30px 50px -28px rgba(20,19,15,.5);
-  -webkit-mask: radial-gradient(circle 7px at 7px 100%, #0000 98%, #000) -7px 0 / 14px 100% repeat-x, linear-gradient(#000, #000);
-  -webkit-mask-composite: source-in;
+/* ---------- hero ---------- */
+.hero { background: var(--color-night); color: var(--color-night-fg); padding: var(--space-3xl) 0 var(--space-4xl); position: relative; isolation: isolate; }
+.hero::after { /* hairline that hands over to the paper */
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: var(--color-brand);
 }
-.receipt::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 8px; background: repeating-linear-gradient(90deg, #fbf9f3 0 7px, transparent 7px 14px); }
-.receipt h2 { font: 700 12px var(--mono); letter-spacing: .14em; text-transform: uppercase; margin: 0 0 4px; }
-.receipt .sub { color: var(--mute); margin-bottom: 14px; }
-.receipt hr { border: 0; border-top: 1.5px dashed var(--rule); margin: 14px 0; }
-.stamp { display: flex; align-items: center; justify-content: space-between; }
-.stamp b { font: 700 40px/1 var(--serif); letter-spacing: .04em; color: var(--safe); border: 3px solid var(--safe); padding: 6px 12px 4px; transform: rotate(-3deg); display: inline-block; }
-.stamp span { text-align: right; color: var(--mute); }
-.stamp span strong { display: block; font: 700 34px/1 var(--mono); color: var(--ink); }
-.receipt dl { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 5px 14px; }
-.receipt dt { color: var(--ink-2); }
-.receipt dd { margin: 0; text-align: right; font-weight: 600; }
-.receipt .foot { color: var(--mute); font-size: 12px; }
-.receipt-note { font: 12px/1.5 var(--mono); color: var(--mute); margin: 22px 6px 0; max-width: 40em; }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: var(--space-3xl); align-items: center; }
+.kicker { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 var(--space-lg); font-size: var(--text-sm); font-weight: 500; color: var(--color-night-mute); }
+.kicker i { width: 8px; height: 8px; border-radius: 50%; background: var(--color-brand-hi); box-shadow: 0 0 0 4px var(--color-brand-glow); }
+h1 { font-size: var(--text-display); font-weight: 800; font-stretch: 118%; line-height: .92; letter-spacing: -.035em; margin: 0 0 var(--space-lg); }
+h1 span { color: var(--color-brand-hi); }
+.lede { font-size: var(--text-lg); line-height: 1.5; max-width: 32em; color: var(--color-night-fg-2); margin: 0 0 var(--space-xl); }
+.lede b { color: var(--color-night-fg); font-weight: 600; }
+.cta { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+  font: 600 15px/1 var(--font-body); padding: 14px 20px; border-radius: var(--radius-md);
+  text-decoration: none; border: 1.5px solid transparent; cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.btn:active { transform: translateY(1px); }
+.btn.go { background: var(--color-brand); color: var(--color-on-brand); }
+.btn.go:hover { background: var(--color-brand-press); text-decoration: none; }
+.btn.ghost { color: var(--color-night-fg); border-color: var(--color-night-rule); }
+.btn.ghost:hover { border-color: var(--color-night-mute); text-decoration: none; }
+.facts { margin: var(--space-xl) 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-lg); font-size: var(--text-sm); color: var(--color-night-mute); }
+.facts li { display: inline-flex; align-items: center; gap: 8px; }
+.facts li::before { content: ""; width: 14px; height: 2px; background: var(--color-brand-hi); }
+.facts b { color: var(--color-night-fg); font-weight: 600; }
 
-/* sections */
-section { padding: 72px 0; border-top: 1px solid var(--ink); }
-.sec-head { display: grid; grid-template-columns: 150px minmax(0,1fr); gap: 28px; margin-bottom: 36px; }
-.sec-no { font: 600 12px var(--mono); letter-spacing: .1em; color: var(--mute); padding-top: 14px; }
-h2.t { font-family: var(--serif); font-size: clamp(30px, 4vw, 46px); line-height: 1.05; letter-spacing: -.02em; margin: 0; font-weight: 700; max-width: 18em; }
-.sec-body { margin-left: 178px; }
-.prose { max-width: 40em; color: var(--ink-2); }
-.prose p { margin: 0 0 1em; }
+/* hero: request / response */
+.call { margin: 0; background: var(--color-night-2); border: 1px solid var(--color-night-rule); border-radius: var(--radius-lg); overflow: hidden; font: 13px/1.6 var(--font-mono); }
+.call .req { padding: var(--space-md) var(--space-lg); border-bottom: 1px solid var(--color-night-rule); display: grid; gap: 4px; }
+.call .req b { color: var(--color-brand-hi); font-weight: 700; margin-right: 8px; }
+.call .req span { overflow-wrap: anywhere; }
+.call .req small { color: var(--color-night-mute); font-size: 12px; }
+.readout { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-lg); align-items: center; padding: var(--space-lg); border-bottom: 1px solid var(--color-night-rule); }
+.badge { font: 800 30px/1 var(--font-display); font-stretch: 118%; letter-spacing: .01em; color: var(--color-night); background: var(--color-night-safe); padding: 10px 14px 8px; border-radius: var(--radius-sm); }
+.meter { min-width: 0; }
+.meter .row { display: flex; justify-content: space-between; align-items: baseline; color: var(--color-night-mute); font-size: 12px; margin-bottom: 8px; }
+.meter .row strong { font: 700 22px/1 var(--font-display); color: var(--color-night-fg); }
+.meter .row strong small { font-size: 13px; font-weight: 500; color: var(--color-night-mute); }
+.bar { position: relative; height: 10px; border-radius: 99px; background: linear-gradient(90deg, var(--color-night-danger) 0 45%, var(--color-night-caution) 45% 75%, var(--color-night-safe) 75% 100%); opacity: .95; }
+.bar i { position: absolute; top: -5px; width: 4px; height: 20px; border-radius: 2px; background: var(--color-night-fg); left: calc(var(--score) * 1% - 2px); box-shadow: 0 0 0 3px var(--color-night-2); }
+.ticks { display: flex; justify-content: space-between; color: var(--color-night-mute); font-size: 11px; margin-top: 8px; position: relative; }
+.ticks span:nth-child(2) { position: absolute; left: 45%; transform: translateX(-50%); }
+.ticks span:nth-child(3) { position: absolute; left: 75%; transform: translateX(-50%); }
+.call pre { margin: 0; padding: var(--space-md) var(--space-lg) var(--space-lg); overflow-x: auto; color: var(--color-night-fg); white-space: pre; }
+.hero-note { margin: var(--space-sm) 2px 0; font-size: 12px; line-height: 1.5; color: var(--color-night-mute); }
+.hero-note code { background: none; padding: 0; color: var(--color-night-fg); }
 
-/* checks ledger */
-.ledger { width: 100%; border-collapse: collapse; }
-.ledger th, .ledger td { text-align: left; vertical-align: top; padding: 16px 18px 16px 0; border-top: 1px solid var(--rule); }
-.ledger tr:last-child td, .ledger tr:last-child th { border-bottom: 1px solid var(--rule); }
-.ledger th { font: 600 13px var(--mono); width: 210px; white-space: nowrap; }
-.ledger th i { font-style: normal; color: var(--mute); margin-right: 10px; }
-.ledger td { color: var(--ink-2); }
+/* syntax */
+.k { color: var(--color-syn-key); } .s { color: var(--color-syn-str); } .n { color: var(--color-syn-num); }
+.c, .dim { color: var(--color-night-mute); }
+.v-safe { color: var(--color-night-safe); font-weight: 700; }
+
+/* ---------- sections ---------- */
+section { padding: var(--space-4xl) 0; }
+section + section { border-top: 1px solid var(--color-rule); }
+.head { display: grid; gap: var(--space-md); margin-bottom: var(--space-2xl); max-width: 46rem; }
+h2 { font-size: var(--text-h2); font-weight: 800; font-stretch: 112%; line-height: 1; letter-spacing: -.03em; margin: 0; }
+.head p { margin: 0; font-size: var(--text-lg); color: var(--color-ink-2); max-width: 38em; }
+
+/* checks */
+.checks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-md); }
+.check { border: 1px solid var(--color-rule); border-radius: var(--radius-lg); padding: var(--space-lg); background: var(--color-paper); display: flex; flex-direction: column; gap: var(--space-sm); }
+.check h3 { font-size: 22px; font-weight: 700; font-stretch: 108%; letter-spacing: -.015em; margin: 0; display: flex; align-items: baseline; gap: 10px; }
+.check h3 small { font: 600 12px/1 var(--font-mono); color: var(--color-mute); }
+.check p { margin: 0; color: var(--color-ink-2); font-size: 16px; }
+.check.lead { grid-column: span 2; background: var(--color-brand-wash); border-color: transparent; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-lg); align-items: center; }
+.check.lead h3 { font-size: 30px; }
+.check.lead .txt { display: flex; flex-direction: column; gap: var(--space-sm); }
+.trip { margin: 0; display: grid; gap: 10px; font: 13px/1.3 var(--font-mono); }
+.trip .leg { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 12px; background: var(--color-paper); border-radius: var(--radius-md); padding: 12px 14px; }
+.trip .leg b { font-family: var(--font-display); font-stretch: 112%; font-size: 15px; }
+.trip .leg span { color: var(--color-mute); overflow-wrap: anywhere; }
+.trip .leg em { font-style: normal; font-weight: 700; color: var(--color-safe); }
+.trip figcaption { color: var(--color-mute); font-size: 12px; }
 
 /* verdict scale */
-.scale { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 0; border: 1.5px solid var(--ink); margin: 0 0 36px; }
-.scale > div { padding: 20px 22px 22px; border-right: 1.5px solid var(--ink); }
-.scale > div:last-child { border-right: 0; }
-.scale b { display: block; font: 700 28px/1 var(--serif); letter-spacing: .04em; margin-bottom: 8px; }
-.scale .s b { color: var(--safe); } .scale .c b { color: var(--caution); } .scale .d b { color: var(--danger); }
-.scale small { display: block; font: 600 12px var(--mono); color: var(--mute); margin-bottom: 8px; }
-.scale p { margin: 0; font-size: 15px; color: var(--ink-2); }
+.scale { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-md); margin: 0 0 var(--space-2xl); }
+.scale > div { border-radius: var(--radius-lg); padding: var(--space-lg); background: var(--color-paper-2); box-shadow: inset 0 6px 0 var(--tone); padding-top: calc(var(--space-lg) + 6px); }
+.scale .sf { --tone: var(--color-safe); } .scale .ca { --tone: var(--color-caution); } .scale .dg { --tone: var(--color-danger); }
+.scale b { display: block; font: 800 32px/1 var(--font-display); font-stretch: 118%; letter-spacing: -.01em; color: var(--tone); margin-bottom: 10px; }
+.scale small { display: block; font: 600 12px/1.4 var(--font-mono); color: var(--color-mute); margin-bottom: 10px; }
+.scale p { margin: 0; font-size: 15px; color: var(--color-ink-2); }
 
-/* code */
-.code { position: relative; background: var(--ink); color: #e9e4d6; border-radius: 0; margin: 0; }
-.code pre { margin: 0; padding: 22px 24px; overflow-x: auto; font-size: 13px; line-height: 1.6; tab-size: 2; }
-.code .bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px 8px 24px; border-bottom: 1px solid rgba(233,228,214,.18); font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #a8a393; }
-.copy { font: 600 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; background: transparent; color: #e9e4d6; border: 1px solid rgba(233,228,214,.4); padding: 5px 10px; cursor: pointer; }
-.copy:hover { background: #e9e4d6; color: var(--ink); }
-.k { color: #e6c07b; } .s { color: #a9c98a; } .n { color: #8fb7d9; } .c { color: #8a8576; font-style: italic; }
-.v-safe { color: #5fd08f; font-weight: 700; }
-.dim { color: #8a8576; }
-.json-wrap { max-height: 640px; overflow: auto; }
-.cap { font: 12px/1.5 var(--mono); color: var(--mute); margin: 12px 0 0; max-width: 60em; }
+/* code blocks */
+.code { background: var(--color-night); color: var(--color-night-fg); border-radius: var(--radius-lg); margin: 0; overflow: hidden; }
+.code pre { margin: 0; padding: var(--space-lg); overflow-x: auto; font-size: 13px; line-height: 1.65; tab-size: 2; }
+.code .bar-top { display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); padding: 10px 12px 10px var(--space-lg); border-bottom: 1px solid var(--color-night-rule); font: 500 12px var(--font-mono); color: var(--color-night-mute); }
+.code .bar-top span { min-width: 0; overflow-wrap: anywhere; }
+.copy { flex: none; font: 600 12px var(--font-body); background: transparent; color: var(--color-night-fg); border: 1px solid var(--color-night-rule); padding: 6px 12px; border-radius: var(--radius-sm); cursor: pointer; white-space: nowrap; transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
+.copy:hover { background: var(--color-night-fg); color: var(--color-night); }
+.json-wrap { max-height: 620px; overflow: auto; }
+.cap { font-size: 14px; line-height: 1.55; color: var(--color-mute); margin: var(--space-md) 0 0; max-width: 62em; }
 
-/* steps */
-.steps { list-style: none; margin: 0 0 18px; padding: 0; counter-reset: step; }
-.steps li { counter-increment: step; display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 4px 12px; padding: 0 0 8px; color: var(--ink-2); font-size: 15px; }
-.steps li::before { content: counter(step); font: 700 13px var(--mono); border: 1.5px solid var(--ink); width: 26px; height: 26px; display: grid; place-items: center; color: var(--ink); }
-details { margin-top: 18px; }
-details summary { cursor: pointer; font: 600 13px var(--mono); }
-details .code { margin-top: 12px; }
+/* quickstart */
+.qs { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
+.steps { list-style: none; margin: 0; padding: 0; counter-reset: step; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-md); }
+.steps li { counter-increment: step; color: var(--color-ink-2); font-size: 15px; border-top: 2px solid var(--color-ink); padding-top: var(--space-md); }
+.steps li::before { content: counter(step); display: block; font: 800 34px/1 var(--font-display); font-stretch: 118%; color: var(--color-brand-text); margin-bottom: 10px; }
+details { border: 1px solid var(--color-rule); border-radius: var(--radius-lg); padding: 0; }
+details summary { cursor: pointer; font-weight: 600; padding: var(--space-md) var(--space-lg); list-style: none; display: flex; justify-content: space-between; gap: var(--space-md); }
+details summary::-webkit-details-marker { display: none; }
+details summary::after { content: "+"; font: 600 20px/1 var(--font-mono); color: var(--color-brand-text); }
+details[open] summary::after { content: "\2212"; }
+details summary:hover { color: var(--color-brand-text); }
+details .code { margin: 0 var(--space-sm) var(--space-sm); }
 
 /* pricing */
-.price { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 0; border: 1.5px solid var(--ink); max-width: 760px; }
-.price > div { padding: 26px 28px 28px; }
-.price > div + div { border-left: 1.5px solid var(--ink); background: var(--paper-2); }
-.price .amt { font: 700 56px/1 var(--serif); letter-spacing: -.03em; }
-.price .amt span { font: 500 15px var(--mono); letter-spacing: 0; color: var(--mute); margin-left: 8px; }
-.price h3 { font: 600 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; margin: 0 0 14px; color: var(--mute); }
-.price p { margin: 12px 0 0; font-size: 15px; color: var(--ink-2); }
-.free { margin-top: 26px; max-width: 760px; font-size: 15px; color: var(--ink-2); }
-.free code { background: var(--paper-2); padding: 2px 6px; font-size: 13px; }
-.list { margin: 0; padding: 0; list-style: none; max-width: 760px; }
-.list li { padding: 12px 0 12px 28px; border-top: 1px solid var(--rule); position: relative; color: var(--ink-2); }
-.list li:last-child { border-bottom: 1px solid var(--rule); }
-.list li::before { content: "\2013"; position: absolute; left: 4px; font-family: var(--mono); color: var(--ink); }
-.list b { color: var(--ink); }
+.price { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-md); }
+.price > div { border-radius: var(--radius-lg); padding: var(--space-xl); border: 1px solid var(--color-rule); display: flex; flex-direction: column; gap: var(--space-sm); }
+.price > div.main { background: var(--color-night); color: var(--color-night-fg); border-color: transparent; }
+.price h3 { font-size: var(--text-sm); font-weight: 600; margin: 0; color: var(--color-mute); }
+.price .main h3 { color: var(--color-night-mute); }
+.price .amt { font: 800 clamp(56px, 8vw, 88px)/.95 var(--font-display); font-stretch: 116%; letter-spacing: -.04em; }
+.price .main .amt { color: var(--color-brand-hi); }
+.price .amt span { font: 500 15px var(--font-mono); letter-spacing: 0; color: var(--color-mute); margin-left: 10px; }
+.price .main .amt span { color: var(--color-night-mute); }
+.price p { margin: 0; font-size: 15px; color: var(--color-ink-2); }
+.price .main p { color: var(--color-night-mute); }
+.price .main p code { background: var(--color-night-2); color: var(--color-night-fg); }
+.free { margin: var(--space-xl) 0 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: var(--space-xl); align-items: start; }
+.free ul { list-style: none; margin: 0; padding: 0; }
+.free li { display: flex; justify-content: space-between; gap: var(--space-md); padding: 10px 0; border-bottom: 1px solid var(--color-rule); font-size: 15px; }
+.free li:first-child { border-top: 1px solid var(--color-rule); }
+.free li a { font-family: var(--font-mono); font-size: 14px; text-decoration: none; color: var(--color-brand-text); white-space: nowrap; }
+.free li a:hover { text-decoration: underline; }
+.free li span { color: var(--color-mute); text-align: right; }
+.free p { margin: 0; color: var(--color-ink-2); font-size: 15px; }
+.free p b { color: var(--color-ink); }
+
+/* limits */
+.limits { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--space-2xl); }
+.limits li { padding: var(--space-lg) 0; border-top: 1px solid var(--color-rule); color: var(--color-ink-2); font-size: 16px; }
+.limits b { display: block; color: var(--color-ink); font-family: var(--font-display); font-stretch: 108%; font-size: 19px; font-weight: 700; letter-spacing: -.01em; margin-bottom: 6px; }
 
 /* footer */
-footer { border-top: 1px solid var(--ink); background: var(--ink); color: #cfc9b8; padding: 44px 0 52px; font-size: 14px; }
-footer .wrap { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); gap: 40px; }
-footer .brand { color: #efeadf; }
-footer a { color: #efeadf; }
-footer p { margin: 10px 0 0; max-width: 38em; }
-footer ul { list-style: none; padding: 0; margin: 0; font: 500 13px var(--mono); }
-footer li { margin: 0 0 8px; }
-.tiny { font: 12px/1.5 var(--mono); color: #8a8576; margin-top: 20px; }
+footer { background: var(--color-night); color: var(--color-night-mute); padding: var(--space-3xl) 0 var(--space-2xl); font-size: 14px; }
+footer .big { display: block; color: var(--color-night-fg); --color-dot: var(--color-brand-hi); margin-bottom: var(--space-2xl); }
+footer .big svg { width: 100%; height: auto; display: block; }
+footer .cols { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--space-2xl); border-top: 1px solid var(--color-night-rule); padding-top: var(--space-xl); }
+footer p { margin: 0 0 10px; max-width: 40em; }
+footer a { color: var(--color-night-fg); }
+footer ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+footer li a { font-family: var(--font-mono); font-size: 13px; }
 
-@media (max-width: 860px) {
-  .hero .wrap { grid-template-columns: 1fr; gap: 44px; }
-  .receipt { transform: none; max-width: 460px; }
-  .sec-head { grid-template-columns: 1fr; gap: 6px; }
-  .sec-body { margin-left: 0; }
-  .scale { grid-template-columns: 1fr; }
-  .scale > div { border-right: 0; border-bottom: 1.5px solid var(--ink); }
-  .scale > div:last-child { border-bottom: 0; }
-  .price { grid-template-columns: 1fr; }
-  .price > div + div { border-left: 0; border-top: 1.5px solid var(--ink); }
-  .ledger th { width: auto; white-space: normal; display: block; padding-bottom: 0; border: 0; }
-  .ledger td { display: block; border-top: 0 !important; padding-top: 4px; }
-  .ledger tr { display: block; border-top: 1px solid var(--rule); }
-  footer .wrap { grid-template-columns: 1fr; }
-  nav a { margin-left: 0; margin-right: 16px; }
+@media (max-width: 960px) {
+  .hero .wrap { grid-template-columns: minmax(0, 1fr); gap: var(--space-2xl); }
+  .checks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .check.lead { grid-column: 1 / -1; }
+  .free { grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
 }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
-@media print { .receipt { transform: none; } }
+@media (max-width: 720px) {
+  .wrap { padding: 0 20px; }
+  .top nav { gap: 16px; }
+  .top nav .opt { display: none; }
+  .hero { padding: var(--space-2xl) 0 var(--space-3xl); }
+  .lede { font-size: 18px; }
+  section { padding: var(--space-3xl) 0; }
+  .head p { font-size: 18px; }
+  .checks, .check.lead, .scale, .steps, .price, .limits { grid-template-columns: minmax(0, 1fr); }
+  .check.lead { grid-column: auto; }
+  .readout { grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
+  .badge { justify-self: start; }
+  .call pre { font-size: 11.5px; padding: var(--space-md); }
+  .call .req, .readout { padding-left: var(--space-md); padding-right: var(--space-md); }
+  .price > div { padding: var(--space-lg); }
+  footer .cols { grid-template-columns: minmax(0, 1fr); gap: var(--space-xl); }
+}
+@media (max-width: 400px) {
+  .top nav a:not(.pill) { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .btn, .copy { transition: none; }
+}
 [hidden]{display:none!important}
 </style>
 </head>
 <body>
 
+<svg class="sym" aria-hidden="true" focusable="false">
+  <symbol id="mk" viewBox="0 0 48 48">
+    <rect width="48" height="48" rx="11" fill="var(--mk-tile)"/>
+    <path d="M30.1 15.6A11 11 0 1 0 23 35H31" fill="none" stroke="var(--mk-glyph)" stroke-width="5.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M30 28.5L39 35L30 41.5Z" fill="var(--mk-glyph)" stroke="var(--mk-glyph)" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle cx="23" cy="24" r="3.3" fill="var(--mk-glyph)"/>
+  </symbol>
+</svg>
+
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="#top">Canisell<small>for bots &amp; agents</small></a>
+    <a class="lockup" href="#top" aria-label="Canisell, home">
+      <svg class="mk" viewBox="0 0 48 48" aria-hidden="true"><use href="#mk"/></svg>
+      <svg class="wm" viewBox="43 -823 4401 835" aria-hidden="true"><path d="M370 12Q269 12 196 -18Q122 -49 83 -110Q43 -171 43 -264Q43 -357 83 -418Q123 -479 196 -509Q269 -540 370 -540Q435 -540 492 -526Q549 -512 592 -485Q635 -457 659 -416Q683 -374 683 -319H503Q503 -349 486 -371Q469 -393 439 -404Q409 -416 369 -416Q321 -416 289 -399Q258 -382 242 -350Q226 -319 226 -276V-251Q226 -209 242 -177Q258 -146 292 -129Q325 -112 376 -112Q415 -112 445 -124Q475 -136 493 -159Q510 -181 510 -210H683Q683 -154 659 -112Q635 -70 592 -42Q549 -15 492 -1Q435 12 370 12ZM979 12Q934 12 895 5Q856 -2 826 -19Q796 -36 779 -66Q762 -96 762 -142Q762 -204 794 -240Q825 -276 883 -294Q941 -312 1021 -317Q1100 -323 1196 -323V-344Q1196 -372 1183 -389Q1170 -407 1143 -415Q1117 -423 1077 -423Q1047 -423 1020 -418Q993 -413 977 -402Q960 -391 960 -373V-365H781Q780 -369 780 -373Q779 -376 779 -381Q779 -428 814 -464Q849 -499 917 -519Q985 -539 1084 -539Q1176 -539 1241 -522Q1306 -505 1341 -466Q1375 -428 1375 -365V-150Q1375 -133 1384 -122Q1392 -112 1408 -112H1456V-7Q1443 -1 1414 6Q1385 12 1351 12Q1306 12 1277 2Q1248 -7 1233 -24Q1218 -41 1212 -62H1204Q1178 -40 1145 -23Q1111 -6 1069 3Q1028 12 979 12ZM1033 -104Q1056 -104 1084 -110Q1112 -115 1138 -127Q1164 -138 1180 -156Q1196 -174 1196 -198V-229Q1110 -229 1053 -221Q996 -213 968 -197Q940 -180 940 -154Q940 -134 953 -123Q967 -112 988 -108Q1010 -104 1033 -104ZM1522 0V-527H1668L1680 -443H1689Q1714 -477 1748 -498Q1782 -520 1821 -530Q1860 -539 1900 -539Q1971 -539 2019 -516Q2067 -493 2092 -445Q2116 -398 2116 -327V0H1937V-302Q1937 -327 1930 -347Q1923 -366 1910 -379Q1896 -391 1877 -398Q1857 -404 1832 -404Q1795 -404 1766 -389Q1736 -373 1719 -347Q1701 -320 1701 -284V0ZM2242 0V-527H2421V0ZM2820 12Q2763 12 2710 2Q2656 -8 2614 -28Q2571 -47 2546 -78Q2521 -109 2521 -152Q2521 -156 2522 -160Q2522 -164 2523 -167H2703Q2702 -165 2702 -162Q2702 -159 2702 -157Q2703 -136 2719 -123Q2736 -110 2763 -104Q2790 -98 2821 -98Q2847 -98 2876 -101Q2904 -104 2924 -114Q2944 -124 2944 -146Q2944 -167 2918 -177Q2893 -187 2850 -193Q2807 -198 2754 -206Q2712 -213 2673 -224Q2634 -234 2604 -252Q2573 -270 2555 -298Q2537 -327 2537 -369Q2537 -416 2560 -449Q2582 -481 2622 -501Q2662 -521 2714 -530Q2767 -539 2828 -539Q2882 -539 2931 -531Q2981 -522 3020 -503Q3059 -485 3082 -456Q3105 -428 3105 -389Q3105 -385 3105 -381Q3105 -376 3104 -374H2925V-380Q2925 -397 2911 -408Q2896 -419 2874 -424Q2851 -430 2825 -430Q2814 -430 2795 -428Q2776 -427 2758 -423Q2740 -419 2727 -411Q2714 -403 2714 -389Q2714 -371 2736 -362Q2757 -354 2793 -349Q2828 -344 2869 -339Q2914 -332 2959 -324Q3004 -315 3041 -298Q3077 -281 3099 -250Q3121 -219 3121 -169Q3121 -117 3098 -82Q3076 -47 3035 -27Q2994 -6 2939 3Q2884 12 2820 12ZM3535 12Q3432 12 3356 -17Q3281 -47 3240 -108Q3199 -169 3199 -264Q3199 -356 3239 -418Q3280 -479 3354 -509Q3427 -539 3527 -539Q3631 -539 3703 -510Q3776 -480 3814 -420Q3852 -361 3852 -269V-228H3384Q3386 -186 3404 -158Q3422 -131 3455 -118Q3489 -104 3536 -104Q3562 -104 3586 -110Q3610 -116 3628 -126Q3646 -137 3657 -152Q3668 -167 3669 -186H3850Q3850 -140 3828 -103Q3805 -66 3763 -41Q3721 -15 3663 -1Q3605 12 3535 12ZM3385 -324H3663Q3663 -348 3654 -366Q3645 -384 3627 -397Q3610 -410 3586 -416Q3562 -423 3533 -423Q3489 -423 3458 -411Q3426 -399 3408 -377Q3390 -354 3385 -324ZM3957 0V-724H4136V0ZM4264 0V-724H4443V0Z"/><circle cx="2332" cy="-712" r="111" fill="var(--color-dot)"/></svg>
+    </a>
     <nav aria-label="Sections">
-      <a href="#verdict">verdict</a>
-      <a href="#quickstart">quickstart</a>
-      <a href="#pricing">pricing</a>
-      <a href="#limits">limits</a>
+      <a class="opt" href="#checks">Checks</a>
+      <a class="opt" href="#verdict">Verdict</a>
+      <a href="#quickstart">Quickstart</a>
+      <a href="#pricing">Pricing</a>
+      <a class="pill" data-href="{{API_URL}}/v1/sample" href="#">Free sample</a>
     </nav>
   </div>
 </header>
@@ -204,73 +359,109 @@ footer li { margin: 0 0 8px; }
 <div class="hero">
   <div class="wrap">
     <div>
-      <p class="eyebrow">Token risk API &middot; Base &middot; x402</p>
-      <h1>Can your bot <em>sell</em> it? Find out for one cent.</h1>
-      <p class="lede">Send a new ERC-20 address on Base, get back <b>SAFE</b>, <b>CAUTION</b> or <b>DANGER</b> with the reasons behind it. The check simulates a buy and a sell, reads the tax, the owner's powers, the liquidity and the token's age. You pay per call in USDC over x402: no account, no API key.</p>
+      <p class="kicker"><i aria-hidden="true"></i>Token risk API for Base, paid per call over x402</p>
+      <h1>Can your bot <span>sell&nbsp;it?</span></h1>
+      <p class="lede">Ask before it buys. One call simulates a buy and a sell of a new Base token, reads the taxes, the owner's powers, the liquidity and the token's age, and answers <b>SAFE</b>, <b>CAUTION</b> or <b>DANGER</b> with the reasons. Pay in USDC per call: no account, no API key.</p>
       <div class="cta">
-        <a class="btn solid" href="#quickstart">Quickstart</a>
-        <a class="btn" href="#verdict">See a real response</a>
+        <a class="btn go" href="#quickstart">Quickstart</a>
+        <a class="btn ghost" href="#verdict">Read a full response</a>
       </div>
       <ul class="facts">
-        <li>$0.01 per check</li>
-        <li>$0.05 per batch of 10</li>
-        <li>MCP tool for Claude Desktop &amp; Cursor</li>
+        <li><b>$0.01</b>&nbsp;per check</li>
+        <li><b>$0.05</b>&nbsp;per batch of 10</li>
+        <li>Failed checks are not charged</li>
       </ul>
     </div>
 
     <div>
-      <div class="receipt" role="img" aria-label="Example verdict receipt: SAFE, score 95 out of 100, for an established token">
-        <h2>Verdict receipt</h2>
-        <div class="sub">BRETT &middot; 0x532f&hellip;42E4 &middot; base</div>
-        <hr>
-        <div class="stamp"><b>SAFE</b><span>score<strong>95</strong></span></div>
-        <hr>
-        <dl>
-          <dt>Simulated buy / sell</dt><dd>both OK</dd>
-          <dt>Buy tax / sell tax</dt><dd>0% / 0%</dd>
-          <dt>Round trip cost</dt><dd>2.0%</dd>
-          <dt>Ownership</dt><dd>renounced</dd>
-          <dt>Upgradeable proxy</dt><dd>no</dd>
-          <dt>Exit liquidity</dt><dd>~$1.0M</dd>
-          <dt>LP lock</dt><dd>unknown</dd>
-          <dt>Token age</dt><dd>&gt; 30 days</dd>
-        </dl>
-        <hr>
-        <div class="foot">paid: $0.01 USDC &middot; x402<br>checked 2026-11-01 &middot; engine 0.1.0</div>
-      </div>
-      <p class="receipt-note">Taken from the free <code>/v1/sample</code> endpoint. It is an established token, so this is what a clean result looks like; the API is built for tokens that launched hours or days ago.</p>
+      <figure class="call" aria-label="Example request and response">
+        <div class="req">
+          <span><b>GET</b>https://api.canisell.xyz/v1/verdict/0x532f&hellip;42E4</span>
+          <small>x402 &middot; $0.01 USDC on Base &middot; 200 OK</small>
+        </div>
+        <div class="readout">
+          <span class="badge">SAFE</span>
+          <div class="meter">
+            <div class="row"><span>score</span><strong>95<small> / 100</small></strong></div>
+            <div class="bar" style="--score:95" role="img" aria-label="Score 95 out of 100, in the SAFE band (75 to 100)"><i></i></div>
+            <div class="ticks" aria-hidden="true"><span>0</span><span>45</span><span>75</span><span>100</span></div>
+          </div>
+        </div>
+<pre>{
+  <span class="k">"verdict"</span>: <span class="v-safe">"SAFE"</span>,
+  <span class="k">"score"</span>: <span class="n">95</span>,
+  <span class="k">"summary"</span>: <span class="s">"No blocking risks found: buy and
+    sell simulate cleanly and no abusive
+    owner controls detected."</span>,
+  <span class="k">"flags"</span>: {
+    <span class="k">"trading"</span>: {
+      <span class="k">"canSell"</span>: <span class="n">true</span>, <span class="k">"sellTaxPct"</span>: <span class="n">0</span>,
+      <span class="k">"roundTripLossPct"</span>: <span class="n">1.99</span>
+    },
+    <span class="k">"ownership"</span>: { <span class="k">"renounced"</span>: <span class="n">true</span> },
+    <span class="k">"liquidity"</span>: { <span class="k">"totalDepthUsd"</span>: <span class="n">1036551</span> }
+  }
+}</pre>
+      </figure>
+      <p class="hero-note">Values from the free <code>/v1/sample</code> endpoint (BRETT, an established token), trimmed. The API is built for tokens that launched hours or days ago.</p>
     </div>
   </div>
 </div>
 
 <section id="checks">
   <div class="wrap">
-    <div class="sec-head"><div class="sec-no">01 / CHECKS</div><h2 class="t">Five things a bot needs to know before it buys</h2></div>
-    <div class="sec-body">
-      <table class="ledger">
-        <tr><th><i>a</i>Can it be sold</th><td>A buy and a sell are simulated with <code>eth_call</code> state overrides against the best pool (Uniswap v2/v3/v4, Aerodrome). If the sell reverts, that is the strongest risk signal the API has.</td></tr>
-        <tr><th><i>b</i>Buy &amp; sell tax</th><td>Measured from the simulation, not read from the source. The round-trip loss (fees, hook taxes, slippage) is reported next to it.</td></tr>
-        <tr><th><i>c</i>Owner powers</th><td>Whether ownership is renounced, and whether the contract exposes mint, blacklist, pause, fee setters, trading switches or limit setters. Detects EIP-1967 and similar upgradeable proxies.</td></tr>
-        <tr><th><i>d</i>Liquidity</th><td>Exit depth in USD across pools, and whether the LP tokens are burned, locked by a known launchpad (Clanker, Zora), or unknown.</td></tr>
-        <tr><th><i>e</i>Token age</th><td>How long ago the contract was created, plus creator signals: share of supply held, repeat deployers, fresh wallets.</td></tr>
-      </table>
+    <div class="head">
+      <h2>Five things a bot needs to know before it buys</h2>
+      <p>Every call runs all five against Base mainnet at the current block. One request, one answer.</p>
+    </div>
+    <div class="checks">
+      <article class="check lead">
+        <div class="txt">
+          <h3><small>a</small>Can it be sold</h3>
+          <p>A buy and a sell are simulated with <code>eth_call</code> state overrides against the best pool (Uniswap v2/v3/v4, Aerodrome). If the sell reverts, that is the strongest risk signal the API has.</p>
+        </div>
+        <figure class="trip">
+          <div class="leg"><b>Buy</b><span>~$20 of WETH in, uniswap-v3</span><em>OK</em></div>
+          <div class="leg"><b>Sell</b><span>sold back to the pool</span><em>OK</em></div>
+          <div class="leg"><b>Cost</b><span>round trip, fees and slippage</span><em>1.99%</em></div>
+          <figcaption>From the /v1/sample response: <code>flags.trading</code></figcaption>
+        </figure>
+      </article>
+      <article class="check">
+        <h3><small>b</small>Buy &amp; sell tax</h3>
+        <p>Measured from the simulation, not read from the source. The round-trip loss (fees, hook taxes, slippage) is reported next to it.</p>
+      </article>
+      <article class="check">
+        <h3><small>c</small>Owner powers</h3>
+        <p>Whether ownership is renounced, and whether the contract exposes mint, blacklist, pause, fee setters, trading switches or limit setters. Detects EIP-1967 and similar upgradeable proxies.</p>
+      </article>
+      <article class="check">
+        <h3><small>d</small>Liquidity</h3>
+        <p>Exit depth in USD across pools, and whether the LP tokens are burned, locked by a known launchpad (Clanker, Zora), or unknown.</p>
+      </article>
+      <article class="check">
+        <h3><small>e</small>Token age</h3>
+        <p>How long ago the contract was created, plus creator signals: share of supply held, repeat deployers, fresh wallets.</p>
+      </article>
     </div>
   </div>
 </section>
 
 <section id="verdict">
   <div class="wrap">
-    <div class="sec-head"><div class="sec-no">02 / VERDICT</div><h2 class="t">A label, a score, and the reasons in plain English</h2></div>
-    <div class="sec-body">
-      <div class="scale">
-        <div class="s"><b>SAFE</b><small>score 75&ndash;100</small><p>Buy and sell simulate cleanly and no abusive owner controls were found. It does not mean the price will hold.</p></div>
-        <div class="c"><b>CAUTION</b><small>score 45&ndash;74</small><p>Tradeable, but with risk signals such as taxes, active owner powers, thin liquidity or an upgradeable proxy.</p></div>
-        <div class="d"><b>DANGER</b><small>score below 45, or any critical signal</small><p>For example a failed simulated sell, a tax of 50% or more, or no pool on the supported DEXes.</p></div>
-      </div>
+    <div class="head">
+      <h2>A label, a score, and the reasons in plain English</h2>
+      <p>Your bot branches on one field. You read the reasons when it says no.</p>
+    </div>
+    <div class="scale">
+      <div class="sf"><b>SAFE</b><small>score 75&ndash;100</small><p>Buy and sell simulate cleanly and no abusive owner controls were found. It does not mean the price will hold.</p></div>
+      <div class="ca"><b>CAUTION</b><small>score 45&ndash;74</small><p>Tradeable, but with risk signals such as taxes, active owner powers, thin liquidity or an upgradeable proxy.</p></div>
+      <div class="dg"><b>DANGER</b><small>score below 45, or any critical signal</small><p>For example a failed simulated sell, a tax of 50% or more, or no pool on the supported DEXes.</p></div>
+    </div>
 
-      <div class="code">
-        <div class="bar"><span>GET /v1/sample &middot; free &middot; response, trimmed</span><button class="copy" type="button" data-copy="#sample-json">Copy</button></div>
-        <div class="json-wrap"><pre id="sample-json">{
+    <div class="code">
+      <div class="bar-top"><span>GET /v1/sample &middot; free &middot; response, trimmed</span><button class="copy" type="button" data-copy="#sample-json">Copy</button></div>
+      <div class="json-wrap"><pre id="sample-json">{
   <span class="k">"address"</span>: <span class="s">"0x532f27101965dd16442E59d40670FaF5eBB142E4"</span>,
   <span class="k">"chain"</span>: <span class="s">"base"</span>,
   <span class="k">"verdict"</span>: <span class="v-safe">"SAFE"</span>,
@@ -361,31 +552,33 @@ footer li { margin: 0 0 8px; }
     <span class="k">"disclaimer"</span>: <span class="s">"Automated on-chain risk signals for Base, not financial advice. A SAFE verdict means no mechanical trap was detected, not that the price will hold."</span>
   }
 }</pre></div>
-      </div>
-      <p class="cap">Real output of the free sample endpoint for an established token, checked 2026-11-01. Display-trimmed: some fields are removed and three findings and seven pools are left out. <code>reasons</code> is sorted most severe first; <code>findings</code> carries the same items with an <code>id</code>, a severity (critical, high, medium, low, info) and the score penalty. Batch calls return <code>{"results": [...]}</code> and report a per-address error instead of failing the whole call.</p>
     </div>
+    <p class="cap">Real output of the free sample endpoint for an established token, checked 2026-11-01. Display-trimmed: some fields are removed and three findings and seven pools are left out. <code>reasons</code> is sorted most severe first; <code>findings</code> carries the same items with an <code>id</code>, a severity (critical, high, medium, low, info) and the score penalty. Batch calls return <code>{"results": [...]}</code> and report a per-address error instead of failing the whole call.</p>
   </div>
 </section>
 
 <section id="quickstart">
   <div class="wrap">
-    <div class="sec-head"><div class="sec-no">03 / QUICKSTART</div><h2 class="t">Three lines. The third one pays.</h2></div>
-    <div class="sec-body">
+    <div class="head">
+      <h2>Three lines. The third one pays.</h2>
+      <p>The 402 response is the sign-up: it tells your client what to pay and where.</p>
+    </div>
+    <div class="qs">
       <div class="code">
-        <div class="bar"><span>shell</span><button class="copy" type="button" data-copy="#qs-shell">Copy</button></div>
+        <div class="bar-top"><span>shell</span><button class="copy" type="button" data-copy="#qs-shell">Copy</button></div>
 <pre id="qs-shell" data-tpl>curl {{API_URL}}/v1/sample                        <span class="dim"># 1. free: see the response shape</span>
 curl -i {{API_URL}}/v1/verdict/0xTOKEN            <span class="dim"># 2. HTTP 402 + USDC payment terms</span>
 node check.mjs 0xTOKEN                            <span class="dim"># 3. signs the 402, retries, prints the verdict</span></pre>
       </div>
-      <ul class="steps" style="margin-top:20px">
+      <ol class="steps">
         <li><span>The sample and health endpoints need nothing.</span></li>
         <li><span>The 402 response carries the price, the USDC asset on Base and the pay-to address in its <code>PAYMENT-REQUIRED</code> header (base64 JSON). Any x402 client can read it.</span></li>
         <li><span><code>check.mjs</code> is the short script below. It uses the standard <code>@x402/fetch</code> client, so the wallet only signs a USDC transfer authorization for the exact price.</span></li>
-      </ul>
+      </ol>
       <details>
-        <summary>check.mjs (JavaScript, about 10 lines)</summary>
+        <summary>check.mjs (JavaScript, ~10 lines)</summary>
         <div class="code">
-          <div class="bar"><span>check.mjs &middot; npm i @x402/fetch @x402/evm viem</span><button class="copy" type="button" data-copy="#qs-js">Copy</button></div>
+          <div class="bar-top"><span>check.mjs &middot; npm i @x402/fetch @x402/evm viem</span><button class="copy" type="button" data-copy="#qs-js">Copy</button></div>
 <pre id="qs-js" data-tpl>import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
 import { ExactEvmScheme } from "@x402/evm";
 import { privateKeyToAccount } from "viem/accounts";
@@ -401,7 +594,7 @@ console.log(JSON.stringify(await res.json(), null, 2));</pre>
         </div>
       </details>
       <details>
-        <summary>Batch: up to 10 addresses for $0.05</summary>
+        <summary>Batch: 10 addresses, $0.05</summary>
         <div class="code">
 <pre data-tpl>curl -X POST {{API_URL}}/v1/verdict/batch \
   -H 'content-type: application/json' \
@@ -415,13 +608,12 @@ console.log(JSON.stringify(await res.json(), null, 2));</pre>
 
 <section id="mcp" hidden><!-- hidden until the canisell-mcp npm package is published -->
   <div class="wrap">
-    <div class="sec-head"><div class="sec-no">04 / MCP</div><h2 class="t">Give Claude Desktop or Cursor a <span class="mono" style="font-size:.78em">check_base_token</span> tool</h2></div>
-    <div class="sec-body">
-      <div class="prose">
-        <p>Claude Desktop and Cursor cannot pay x402 invoices themselves, so the MCP server acts as the payer: it signs from a wallet you give it and enforces a per-call cap. Without a wallet the tool does not fail silently; it returns the 402 payment terms instead of a verdict.</p>
-      </div>
-      <div class="code">
-        <div class="bar"><span>claude_desktop_config.json &middot; or ~/.cursor/mcp.json</span><button class="copy" type="button" data-copy="#mcp-json">Copy</button></div>
+    <div class="head">
+      <h2>Give Claude Desktop or Cursor a <span class="mono" style="font-size:.7em">check_base_token</span> tool</h2>
+      <p>Claude Desktop and Cursor cannot pay x402 invoices themselves, so the MCP server acts as the payer: it signs from a wallet you give it and enforces a per-call cap. Without a wallet the tool does not fail silently; it returns the 402 payment terms instead of a verdict.</p>
+    </div>
+    <div class="code">
+      <div class="bar-top"><span>claude_desktop_config.json &middot; or ~/.cursor/mcp.json</span><button class="copy" type="button" data-copy="#mcp-json">Copy</button></div>
 <pre id="mcp-json" data-tpl>{
   "mcpServers": {
     "canisell": {
@@ -435,39 +627,45 @@ console.log(JSON.stringify(await res.json(), null, 2));</pre>
     }
   }
 }</pre>
-      </div>
-      <p class="cap">Use a throwaway wallet funded with a few dollars of USDC on Base, never your main one. The key stays in your client config; it is only used locally to sign payments. The tool takes one argument, the token address, and returns the verdict JSON. If <code>npx</code> is not on the app's PATH, use its absolute path.</p>
     </div>
+    <p class="cap">Use a throwaway wallet funded with a few dollars of USDC on Base, never your main one. The key stays in your client config; it is only used locally to sign payments. The tool takes one argument, the token address, and returns the verdict JSON. If <code>npx</code> is not on the app's PATH, use its absolute path.</p>
   </div>
 </section>
 
 <section id="pricing">
   <div class="wrap">
-    <div class="sec-head"><div class="sec-no">04 / PRICING</div><h2 class="t">Pay for the calls you make. Nothing else.</h2></div>
-    <div class="sec-body">
-      <div class="price">
-        <div><h3>One token</h3><div class="amt">$0.01<span>USDC</span></div><p><code>GET /v1/verdict/{address}</code></p></div>
-        <div><h3>Batch of up to 10</h3><div class="amt">$0.05<span>USDC</span></div><p><code>POST /v1/verdict/batch</code><br>$0.005 per token, duplicates removed.</p></div>
-      </div>
-      <p class="free"><b>Free:</b> <code>/</code> (service description), <code>/v1/health</code> (RPC reachability) and <code>/v1/sample</code> (example response). Payment is in USDC on Base through the x402 protocol: the server keeps no accounts or keys, a facilitator verifies and settles each payment. Results are cached for 60 seconds per address.</p>
+    <div class="head">
+      <h2>Pay for the calls you make. Nothing else.</h2>
+    </div>
+    <div class="price">
+      <div class="main"><h3>One token</h3><div class="amt">$0.01<span>USDC</span></div><p><code>GET /v1/verdict/{address}</code></p></div>
+      <div><h3>Batch of up to 10</h3><div class="amt">$0.05<span>USDC</span></div><p><code>POST /v1/verdict/batch</code><br>$0.005 per token, duplicates removed.</p></div>
+    </div>
+    <div class="free">
+      <ul>
+        <li><a data-href="{{API_URL}}/" href="#">/</a><span>service description, free</span></li>
+        <li><a data-href="{{API_URL}}/v1/health" href="#">/v1/health</a><span>RPC reachability, free</span></li>
+        <li><a data-href="{{API_URL}}/v1/sample" href="#">/v1/sample</a><span>example response, free</span></li>
+      </ul>
+      <p><b>How payment works.</b> Payment is in USDC on Base through the x402 protocol: the server keeps no accounts or keys, a facilitator verifies and settles each payment. Results are cached for 60 seconds per address.</p>
     </div>
   </div>
 </section>
 
 <section id="limits">
   <div class="wrap">
-    <div class="sec-head"><div class="sec-no">05 / LIMITS</div><h2 class="t">What this is not</h2></div>
-    <div class="sec-body">
-      <ul class="list">
-        <li><b>Heuristics, not advice.</b> The output is automated on-chain risk signals. It is not financial advice and not an audit. A SAFE verdict means no mechanical trap was detected at that block, not that the price will hold or that the token cannot be rugged later.</li>
-        <li><b>A snapshot.</b> An owner who keeps powers can change the token after the check. Re-check before large trades; results are cached for 60 seconds.</li>
-        <li><b>Base mainnet only</b> (chain 8453), and ERC-20 tokens traded on Uniswap v2/v3/v4 or Aerodrome pools. Tokens that trade elsewhere may show as having no pool.</li>
-        <li><b>The simulation is one size.</b> The buy is simulated at roughly $20. Large orders can face more slippage, and some Uniswap v4 hooks treat a same-transaction buy and sell differently from a later sale; those cases can produce false positives or false negatives.</li>
-        <li><b>Some facts are unknowable from the chain.</b> LP lock status is often "unknown" for position-NFT liquidity. Off-chain signals (team, social, off-DEX transfers) are not looked at.</li>
-        <li><b>Mechanics, not intent.</b> The API reports signals for an address. It does not say who is behind a token or whether anyone meant harm.</li>
-        <li><b>Early service.</b> Engine 0.1.0, one operator, no uptime guarantee. A free <code>/v1/health</code> endpoint shows whether the service can reach the chain.</li>
-      </ul>
+    <div class="head">
+      <h2>What this is not</h2>
     </div>
+    <ul class="limits">
+      <li><b>Heuristics, not advice.</b> The output is automated on-chain risk signals. It is not financial advice and not an audit. A SAFE verdict means no mechanical trap was detected at that block, not that the price will hold or that the token cannot be rugged later.</li>
+      <li><b>A snapshot.</b> An owner who keeps powers can change the token after the check. Re-check before large trades; results are cached for 60 seconds.</li>
+      <li><b>Base mainnet only.</b> Chain 8453, and ERC-20 tokens traded on Uniswap v2/v3/v4 or Aerodrome pools. Tokens that trade elsewhere may show as having no pool.</li>
+      <li><b>The simulation is one size.</b> The buy is simulated at roughly $20. Large orders can face more slippage, and some Uniswap v4 hooks treat a same-transaction buy and sell differently from a later sale; those cases can produce false positives or false negatives.</li>
+      <li><b>Some facts are unknowable from the chain.</b> LP lock status is often "unknown" for position-NFT liquidity. Off-chain signals (team, social, off-DEX transfers) are not looked at.</li>
+      <li><b>Mechanics, not intent.</b> The API reports signals for an address. It does not say who is behind a token or whether anyone meant harm.</li>
+      <li><b>Early service.</b> Engine 0.1.0, one operator, no uptime guarantee. A free <code>/v1/health</code> endpoint shows whether the service can reach the chain.</li>
+    </ul>
   </div>
 </section>
 
@@ -475,23 +673,24 @@ console.log(JSON.stringify(await res.json(), null, 2));</pre>
 
 <footer>
   <div class="wrap">
-    <div>
-      <a class="brand" href="#top">Canisell</a>
-      <p>A pay-per-call risk-signal API for new Base tokens, built for trading bots and AI agents. Automated service: responses are generated by software.</p>
-      <p class="tiny">Not financial advice. Risk signals are heuristics and can be wrong. Token names and symbols in examples are data returned by the chain, not endorsements or accusations.</p>
-    </div>
-    <div>
+    <a class="big" href="#top" aria-label="Canisell, back to top"><svg viewBox="43 -823 4401 835" aria-hidden="true" class="wm"><path d="M370 12Q269 12 196 -18Q122 -49 83 -110Q43 -171 43 -264Q43 -357 83 -418Q123 -479 196 -509Q269 -540 370 -540Q435 -540 492 -526Q549 -512 592 -485Q635 -457 659 -416Q683 -374 683 -319H503Q503 -349 486 -371Q469 -393 439 -404Q409 -416 369 -416Q321 -416 289 -399Q258 -382 242 -350Q226 -319 226 -276V-251Q226 -209 242 -177Q258 -146 292 -129Q325 -112 376 -112Q415 -112 445 -124Q475 -136 493 -159Q510 -181 510 -210H683Q683 -154 659 -112Q635 -70 592 -42Q549 -15 492 -1Q435 12 370 12ZM979 12Q934 12 895 5Q856 -2 826 -19Q796 -36 779 -66Q762 -96 762 -142Q762 -204 794 -240Q825 -276 883 -294Q941 -312 1021 -317Q1100 -323 1196 -323V-344Q1196 -372 1183 -389Q1170 -407 1143 -415Q1117 -423 1077 -423Q1047 -423 1020 -418Q993 -413 977 -402Q960 -391 960 -373V-365H781Q780 -369 780 -373Q779 -376 779 -381Q779 -428 814 -464Q849 -499 917 -519Q985 -539 1084 -539Q1176 -539 1241 -522Q1306 -505 1341 -466Q1375 -428 1375 -365V-150Q1375 -133 1384 -122Q1392 -112 1408 -112H1456V-7Q1443 -1 1414 6Q1385 12 1351 12Q1306 12 1277 2Q1248 -7 1233 -24Q1218 -41 1212 -62H1204Q1178 -40 1145 -23Q1111 -6 1069 3Q1028 12 979 12ZM1033 -104Q1056 -104 1084 -110Q1112 -115 1138 -127Q1164 -138 1180 -156Q1196 -174 1196 -198V-229Q1110 -229 1053 -221Q996 -213 968 -197Q940 -180 940 -154Q940 -134 953 -123Q967 -112 988 -108Q1010 -104 1033 -104ZM1522 0V-527H1668L1680 -443H1689Q1714 -477 1748 -498Q1782 -520 1821 -530Q1860 -539 1900 -539Q1971 -539 2019 -516Q2067 -493 2092 -445Q2116 -398 2116 -327V0H1937V-302Q1937 -327 1930 -347Q1923 -366 1910 -379Q1896 -391 1877 -398Q1857 -404 1832 -404Q1795 -404 1766 -389Q1736 -373 1719 -347Q1701 -320 1701 -284V0ZM2242 0V-527H2421V0ZM2820 12Q2763 12 2710 2Q2656 -8 2614 -28Q2571 -47 2546 -78Q2521 -109 2521 -152Q2521 -156 2522 -160Q2522 -164 2523 -167H2703Q2702 -165 2702 -162Q2702 -159 2702 -157Q2703 -136 2719 -123Q2736 -110 2763 -104Q2790 -98 2821 -98Q2847 -98 2876 -101Q2904 -104 2924 -114Q2944 -124 2944 -146Q2944 -167 2918 -177Q2893 -187 2850 -193Q2807 -198 2754 -206Q2712 -213 2673 -224Q2634 -234 2604 -252Q2573 -270 2555 -298Q2537 -327 2537 -369Q2537 -416 2560 -449Q2582 -481 2622 -501Q2662 -521 2714 -530Q2767 -539 2828 -539Q2882 -539 2931 -531Q2981 -522 3020 -503Q3059 -485 3082 -456Q3105 -428 3105 -389Q3105 -385 3105 -381Q3105 -376 3104 -374H2925V-380Q2925 -397 2911 -408Q2896 -419 2874 -424Q2851 -430 2825 -430Q2814 -430 2795 -428Q2776 -427 2758 -423Q2740 -419 2727 -411Q2714 -403 2714 -389Q2714 -371 2736 -362Q2757 -354 2793 -349Q2828 -344 2869 -339Q2914 -332 2959 -324Q3004 -315 3041 -298Q3077 -281 3099 -250Q3121 -219 3121 -169Q3121 -117 3098 -82Q3076 -47 3035 -27Q2994 -6 2939 3Q2884 12 2820 12ZM3535 12Q3432 12 3356 -17Q3281 -47 3240 -108Q3199 -169 3199 -264Q3199 -356 3239 -418Q3280 -479 3354 -509Q3427 -539 3527 -539Q3631 -539 3703 -510Q3776 -480 3814 -420Q3852 -361 3852 -269V-228H3384Q3386 -186 3404 -158Q3422 -131 3455 -118Q3489 -104 3536 -104Q3562 -104 3586 -110Q3610 -116 3628 -126Q3646 -137 3657 -152Q3668 -167 3669 -186H3850Q3850 -140 3828 -103Q3805 -66 3763 -41Q3721 -15 3663 -1Q3605 12 3535 12ZM3385 -324H3663Q3663 -348 3654 -366Q3645 -384 3627 -397Q3610 -410 3586 -416Q3562 -423 3533 -423Q3489 -423 3458 -411Q3426 -399 3408 -377Q3390 -354 3385 -324ZM3957 0V-724H4136V0ZM4264 0V-724H4443V0Z"/><circle cx="2332" cy="-712" r="111" fill="var(--color-dot)"/></svg></a>
+    <div class="cols">
+      <div>
+        <p>A pay-per-call risk-signal API for new Base tokens, built for trading bots and AI agents. Automated service: responses are generated by software.</p>
+        <p>Not financial advice. Risk signals are heuristics and can be wrong. Token names and symbols in examples are data returned by the chain, not endorsements or accusations.</p>
+      </div>
       <ul>
         <li><a data-href="{{API_URL}}/v1/sample" href="#">/v1/sample</a> &middot; free example</li>
         <li><a data-href="{{API_URL}}/v1/health" href="#">/v1/health</a> &middot; status</li>
-        <li><a data-href="{{API_URL}}/" href="#">/</a> &middot; service description</li>
+        <li><a data-href="{{API_URL}}/openapi.json" href="#">/openapi.json</a> &middot; OpenAPI 3.1</li>
+        <li><a data-href="{{API_URL}}/llms.txt" href="#">/llms.txt</a> &middot; for LLMs</li>
         <li><a href="https://www.x402.org" rel="noopener">x402 protocol</a></li>
       </ul>
     </div>
   </div>
 </footer>
 
-<noscript><div class="wrap" style="padding:16px 28px;font:13px var(--mono)">JavaScript is only used to fill in the API URL in the snippets and for the copy buttons. Replace <code>{{API_URL}}</code> with the service URL.</div></noscript>
+<noscript><div class="wrap" style="padding:16px 20px;font:13px var(--font-mono)">JavaScript is only used to fill in the API URL in the snippets and for the copy buttons. The API lives at https://api.canisell.xyz.</div></noscript>
 
 <script>
 // ---- CONFIG: the only place to edit before deploying ---------------------------------
