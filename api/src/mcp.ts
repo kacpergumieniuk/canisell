@@ -238,13 +238,27 @@ function buildServer(deps: McpDeps): McpServer {
   return server;
 }
 
+/**
+ * The SDK answers 406 to a POST whose Accept lacks application/json or text/event-stream. Directory health checks
+ * and crawlers often send only application/json, a wildcard or no Accept at all. Responses are always JSON here
+ * (enableJsonResponse), so such requests are served instead of rejected.
+ */
+export function withLenientAccept(request: Request): Request {
+  if (request.method !== "POST") return request;
+  const accept = request.headers.get("accept") ?? "";
+  if (accept.includes("application/json") && accept.includes("text/event-stream")) return request;
+  const headers = new Headers(request.headers);
+  headers.set("accept", "application/json, text/event-stream");
+  return new Request(request, { headers });
+}
+
 /** Handles one HTTP request to /mcp. */
 export async function handleMcp(request: Request, deps: McpDeps): Promise<Response> {
   const server = buildServer(deps);
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true, maxRequestBodySize: 64 * 1024 });
   await server.connect(transport);
   try {
-    return await transport.handleRequest(request);
+    return await transport.handleRequest(withLenientAccept(request));
   } finally {
     // JSON mode: the response body is complete once handleRequest resolves.
     void server.close().catch(() => {});

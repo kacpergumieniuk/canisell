@@ -187,6 +187,18 @@ describe("remote MCP endpoint /mcp (Streamable HTTP, stateless)", () => {
     expect((await app.request(MCP_URL, { method: "DELETE" })).status).toBe(405);
   });
 
+  it("POST /mcp serves clients that send only application/json, */* or no Accept (no 406)", async () => {
+    const { app } = makeApp();
+    const init = { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "probe", version: "1" } } };
+    for (const accept of ["application/json", "*/*", undefined]) {
+      const headers: Record<string, string> = { "content-type": "application/json" };
+      if (accept) headers.accept = accept;
+      const r = await app.request(MCP_URL, { method: "POST", headers, body: JSON.stringify(init) });
+      expect(r.status).toBe(200);
+      expect(((await r.json()) as any).result.serverInfo).toBeDefined();
+    }
+  });
+
   it("/mcp is listed in discovery (root, llms.txt, OpenAPI)", async () => {
     const { app } = makeApp();
     const root: any = await (await app.request("http://local/")).json();

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "xyz.canisell/canisell",
+  "title": "Canisell",
+  "description": "Can I sell this Base token? Honeypot, tax and exit-liquidity verdict. Free metadata; $0.01 via x402.",
+  "repository": {
+    "url": "https://github.com/kacpergumieniuk/canisell",
+    "source": "github"
+  },
+  "version": "0.2.0",
+  "websiteUrl": "https://canisell.xyz",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.canisell.xyz/mcp"
+    }
+  ]
+}

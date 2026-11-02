@@ -8,7 +8,7 @@ import { SAMPLE_VERDICT } from "./sample.ts";
 import type { Timings } from "./timing.ts";
 import { ADDRESS_SCHEMA, BATCH_INPUT_SCHEMA, BATCH_OUTPUT_SCHEMA, VERDICT_OUTPUT_SCHEMA } from "./schema.ts";
 
-export const SERVICE_NAME = "Base Launch-Token Verdict";
+export const SERVICE_NAME = "Canisell";
 export const SINGLE_DESCRIPTION =
   "Pre-trade risk verdict for a Base ERC-20 (built for brand-new Clanker/Zora/Uniswap v4 launches): simulated buy+sell (honeypot, taxes, round-trip loss), owner powers (mint/blacklist/pause/fee setters, upgradeable proxy), exit liquidity and LP lock, token age and creator history. Returns SAFE/CAUTION/DANGER, a 0-100 score and reasons.";
 export const BATCH_DESCRIPTION = "Same verdict for up to 10 Base ERC-20 tokens in one paid call.";
