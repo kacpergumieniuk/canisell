@@ -17,3 +17,7 @@ Pay with any x402 client (for example `@x402/fetch`). Results are automated risk
 
 - `api/`: the API (Hono, Cloudflare Workers), the MCP server and tests. See [api/README.md](api/README.md).
 - `landing/`: the static site at canisell.xyz and listing texts.
+
+---
+
+[A Mintward product](https://mintward.xyz)
